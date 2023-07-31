@@ -1,69 +1,57 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import styles from '../styles/Home.module.css';
 
 export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Create Next App</title>
-        <link rel="icon" href="/favicon.ico" />
+        <title>Mike Heaton</title>
+        <link rel="icon" href="/happy.ico" />
       </Head>
 
       <main>
         <h1 className={styles.title}>
-          I'm writing <a href="https://nextjs.org">Next.js!</a>
+          Hi, I'm Mike.
         </h1>
 
-        <h2 className="title">
-          Read <Link href="/posts/first">this page!</Link>
-        </h2>
+        <div className="ppContainer">
+        <Image
+          src="/face.png"
+          width={500}
+          height={500}
+          alt="Picture of the author"
+        />
+        </div>
 
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h3>Documentation &rarr;</h3>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
+        <div className="contactsContainer">
+          <a href="https://www.linkedin.com/in/mikeheatonsf/" className="contact"><Image
+            src="/linkedin-circle-large.png"
+            width={50}
+            height={50}
+            alt="Linkedin: @mikeheatonsf"
+          /></a>
 
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h3>Learn &rarr;</h3>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
+          <a href="mailto:mike@mikeheaton.uk=" className="contact"><Image
+            src="/email-circle-large.png"
+            width={50}
+            height={50}
+            alt="Email: mike@mikeheaton.uk"
+          /></a>
 
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h3>Examples &rarr;</h3>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/import?filter=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h3>Deploy &rarr;</h3>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
+          <a href="https://twitter.com/realmikeheaton/" className="contact"><Image
+            src="/twitter-circle-large.png"
+            width={50}
+            height={50}
+            alt="Twitter: @realmikeheaton"
+          /></a>
         </div>
       </main>
 
-      <footer>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <img src="/vercel.svg" alt="Vercel" className={styles.logo} />
-        </a>
-      </footer>
-
       <style jsx>{`
         main {
-          padding: 5rem 0;
+          padding: 5%;
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -95,6 +83,20 @@ export default function Home() {
           font-size: 1.1rem;
           font-family: Menlo, Monaco, Lucida Console, Liberation Mono,
             DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
+        }
+        .contactsContainer {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          width:80%;
+          padding: 5%;
+        }
+        .contact {
+          width: 20%;
+        }
+        .ppContainer {
+          justify-content: center;
+          padding: 5%;
         }
       `}</style>
 
