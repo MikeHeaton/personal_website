@@ -52,6 +52,12 @@ const initial = {
     temperature: 67,
     code: 0,
     label: "Clear skies",
+    updatedAt: Date.parse("2026-09-15T21:58:00Z"),
+    hours: Array.from({ length: 24 }, (_, i) => ({
+      time: `2026-09-${i < 3 ? "15" : "16"}T${String((21 + i) % 24).padStart(2, "0")}:00`,
+      temperature: 60 + (i % 7),
+      rain: i % 5 === 0 ? 0.04 : 0,
+    })),
     days: [{ date: "2026-09-15", code: 0, high: 70, low: 54, rain: 2 }],
   },
 };
@@ -64,6 +70,11 @@ test("initial HTML contains artwork and forecast without executing JavaScript", 
   assert.match(html, /&lt;Painting&gt;/);
   assert.match(html, /Artist &amp; Co/);
   assert.match(html, /viewBox="0 0 1080 1920"/);
+  assert.match(html, /id="hourly-chart"/);
+  assert.match(html, /NEXT 24 HOURS/);
+  assert.match(html, /TEMPERATURE \(°F\)/);
+  assert.match(html, /RAINFALL \(IN\)/);
+  assert.match(html, /Last changed 2:58 PM/);
   assert.doesNotMatch(html, /<script/);
   assert.doesNotMatch(html, /<script nonce=/);
 });
@@ -79,6 +90,7 @@ test("weather failure still renders art and retries promptly without JS", () => 
   });
   assert.match(html, /xlink:href="\/api\/display\/art\?id=436535"/);
   assert.match(html, /Weather unavailable/);
+  assert.doesNotMatch(html, /Last changed/);
   assert.equal(refreshSeconds(Date.parse("2026-09-15T21:20:00Z"), false), 60);
   assert.equal(refreshSeconds(Date.parse("2026-09-15T21:59:59.900Z"), true), 1);
 });
