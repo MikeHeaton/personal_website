@@ -175,6 +175,7 @@ import {
   hourlyChart,
   layout,
   quoteForHour,
+  temperatureAxisBounds,
 } from "../lib/display/scene.mjs";
 import { calendar, parseCalendar } from "../lib/display-calendar.mjs";
 test("forecast columns fill their frame evenly and every panel stays on the canvas", () => {
@@ -271,6 +272,29 @@ test("rainfall axis uses a 0.05-inch baseline and expands with rounded headroom"
   const expanded = hourlyChart(wet, layout.chart, initial.serverTime);
   assert.match(expanded, />0\.35<\/text>/);
   assert.doesNotMatch(expanded, />0\.05<\/text>/);
+});
+
+test("temperature axis bounds retain padding and always use multiples of 10°F", () => {
+  const cases = [
+    { values: [58, 68], expected: { min: 50, max: 70 } },
+    { values: [60, 60], expected: { min: 50, max: 70 } },
+    { values: [69, 69], expected: { min: 60, max: 70 } },
+    { values: [70, 70], expected: { min: 60, max: 80 } },
+    { values: [-1, -1], expected: { min: -10, max: 0 } },
+  ];
+
+  for (const { values, expected } of cases) {
+    const bounds = temperatureAxisBounds(values);
+    assert.deepEqual(bounds, expected);
+    assert.ok(Number.isInteger(bounds.min / 10));
+    assert.ok(Number.isInteger(bounds.max / 10));
+    assert.ok(values.every((value) => value >= bounds.min && value <= bounds.max));
+    assert.ok(bounds.min < bounds.max);
+  }
+
+  const chart = hourlyChart(initial.weather, layout.chart, initial.serverTime);
+  assert.match(chart, />50°<\/text>/);
+  assert.match(chart, />70°<\/text>/);
 });
 
 test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
