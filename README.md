@@ -2,34 +2,45 @@
 
 Next.js website with a private Electric Objects display at `/display`.
 
-## Display
+## Display drawing framework
 
-- Public-domain paintings from the Metropolitan Museum of Art, served through authenticated image routes. Provenance lives in `lib/art.json`; images are outside `public/`.
-- Current San Francisco conditions and five-day forecast in Fahrenheit, from Open-Meteo.
-- Artwork rotates every clock hour. A server-clock-aligned timer fetches content every ten minutes; visibility/network recovery and a watchdog catch missed updates. Failed requests retry after a minute and retain already displayed content.
-- Initial artwork, date, and weather are rendered on the server. The page works without JavaScript; an HTML refresh targets the next ten-minute boundary (or retries within a minute if weather is unavailable). A forced HTML refresh remains active on every browser, even when the same-origin ES5 script is also fetching updates. No museum or weather requests originate from the device.
-- Plain HTML, CSS and ES5 JavaScript avoid requiring React hydration or modern browser APIs on the E01.
+The display is a server-rendered SVG 1.1 scene on a **1080 × 1920 design surface**. It scales uniformly to the browser viewport. It requires no client JavaScript, modern CSS layout, external fonts, or canvas runtime. Artwork and weather are loaded from the same website; only the server contacts Open-Meteo.
 
-## Development
+- `lib/display/drawing.mjs`: escaped text, rectangles, rules, equal-width columns, wrapped text, fitted images, and the scalable surface.
+- `lib/display/scene.mjs`: named layout frames, palette/typography choices, and reusable artwork, current-weather, and forecast panels.
+- `lib/display-page.mjs`: HTML document, password form, and automatic refresh.
+- `lib/display-data.mjs`: independent refresh, artwork rotation, and weather-cache clocks.
 
-Use Node 24, run `npm install`, then `npm run dev`. Open `/display`.
+To change the scene, compose drawing primitives inside a named frame. Use design coordinates instead of screen pixels. Keep text sizes explicit, reserve space for long labels, and use `columns()` to distribute repeated panels. Images use SVG `preserveAspectRatio="xMidYMid meet"` to center the complete artwork without cropping. SVG transforms and `xlink:href` support the EO1's older browser.
 
-Set `DISPLAY_PASSWORD_HASH` and `DISPLAY_SESSION_SECRET` in `.env.local`. Generate a random password and hash with:
+The current layout gives the weather a full-width band with bold sans-serif type and five evenly spaced forecast columns. Artwork captions use serif type.
+
+## Content and refresh
+
+- Four public-domain paintings from the Metropolitan Museum of Art. Provenance is in `lib/art.json`; image files are outside `public/` and served only after authentication.
+- San Francisco current conditions and five-day forecast in Fahrenheit from Open-Meteo.
+- **Forced page refresh every 60 seconds**, aligned to minute boundaries, for device iteration. Change `REFRESH_INTERVAL` to alter this.
+- Artwork rotation remains hourly; weather is cached for ten minutes independently of page refresh.
+- A weather-service failure still renders the painting and retries on the next refresh. A complete network outage can interrupt page reloads.
+
+## Development and tests
+
+Use Node 24. Run `npm install`, `npm run dev`, `npm test`, and `npm run build`.
+
+Tests cover authentication, session expiry/revocation, refresh timing, no-JavaScript rendering, weather failure, escaping, and frame/column bounds. Verify both portrait and landscape artworks in a browser; then check the actual EO1 through the camera after it refreshes. Modern-browser screenshots alone do not establish old-device compatibility.
+
+## Security and deployment
+
+Set `DISPLAY_PASSWORD_HASH` and `DISPLAY_SESSION_SECRET` in `.env.local` and the Vercel production environment. Generate credentials with:
 
 ```
 node scripts/create-display-password.mjs /tmp/display
 ```
 
-This writes three mode-0600 files: `-password.txt`, `-hash.txt`, and `-secret.txt`. Store the hash and secret in environment variables; keep the password in your password manager. Do not commit any of them.
+The generated files are mode 0600. Keep the password in a password manager; never commit credentials.
 
-## Security and deployment
+Passwords use scrypt. Signed HttpOnly, Secure, SameSite=Lax cookies expire after 180 days. Changing the password hash or session secret revokes existing cookies after redeployment. All private routes authenticate independently and return non-cacheable responses. Missing credentials fail closed.
 
-Password verification uses scrypt. Signed HttpOnly, Secure, SameSite=Lax cookies expire after 180 days. Rotating either the password hash or session secret revokes existing sessions after redeployment. Every data/image route independently verifies the cookie; protected responses are private and non-cacheable. Missing credentials fail closed. Local development permits HTTP cookies; deployed environments require HTTPS.
+Production: `personal-website-dtb8`, team `mikeheatons-projects`. Deploy with `vercel deploy --prod --yes --scope mikeheatons-projects`. Attribute commits to the verified account email so Vercel accepts the deployment.
 
-Production project: `personal-website-dtb8` in `mikeheatons-projects`. Configure the two secrets in Vercel before deploying. Preview deployments without secrets remain locked.
-
-Vercel Firewall rule `Display login attempts` limits the login route to 10 requests per 300 seconds per IP. This platform setting is essential: it persists outside this repository and should be recreated when migrating projects. Vercel counters are regional, not an exact global limit.
-
-Run `npm test` and `npm run build`, then `vercel deploy --prod --yes --scope mikeheatons-projects`. Verify the public homepage, display login, protected JSON/images, cookie flags, and the firewall rule after deployment.
-
-The E01's own browser still needs a physical check for HTTPS support and login persistence across a power cycle.
+The Vercel Firewall `Display login attempts` rule limits POSTs to the resolved login route to 10 per 300 seconds per IP. It is platform configuration outside this repository; recreate it if migrating. Counters are regional, not an exact global limit.
