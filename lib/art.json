@@ -1,0 +1,38 @@
+[
+  {
+    "id": 436535,
+    "title": "Wheat Field with Cypresses",
+    "artist_title": "Vincent van Gogh",
+    "date_display": "1889",
+    "source": "https://www.metmuseum.org/art/collection/search/436535",
+    "imageSource": "https://images.metmuseum.org/CRDImages/ep/original/DP-42549-001.jpg",
+    "is_public_domain": true
+  },
+  {
+    "id": 436532,
+    "title": "Self-Portrait with a Straw Hat (obverse: The Potato Peeler)",
+    "artist_title": "Vincent van Gogh",
+    "date_display": "1887",
+    "source": "https://www.metmuseum.org/art/collection/search/436532",
+    "imageSource": "https://images.metmuseum.org/CRDImages/ep/original/DT1502_cropped2.jpg",
+    "is_public_domain": true
+  },
+  {
+    "id": 437310,
+    "title": "The Boulevard Montmartre on a Winter Morning",
+    "artist_title": "Camille Pissarro",
+    "date_display": "1897",
+    "source": "https://www.metmuseum.org/art/collection/search/437310",
+    "imageSource": "https://images.metmuseum.org/CRDImages/ep/original/DP-21959-001.jpg",
+    "is_public_domain": true
+  },
+  {
+    "id": 436965,
+    "title": "The Monet Family in Their Garden at Argenteuil",
+    "artist_title": "Edouard Manet",
+    "date_display": "1874",
+    "source": "https://www.metmuseum.org/art/collection/search/436965",
+    "imageSource": "https://images.metmuseum.org/CRDImages/ep/original/DP-25465-001.jpg",
+    "is_public_domain": true
+  }
+]

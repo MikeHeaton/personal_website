@@ -1,0 +1,10 @@
+import { randomBytes } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+import { passwordHash } from '../lib/display-auth.mjs';
+const password = randomBytes(18).toString('base64url');
+const prefix = process.argv[2];
+if (!prefix) throw new Error('Pass an absolute output prefix outside the repository.');
+writeFileSync(prefix + '-password.txt', password + '\n', { mode: 0o600 });
+writeFileSync(prefix + '-hash.txt', passwordHash(password), { mode: 0o600 });
+writeFileSync(prefix + '-secret.txt', randomBytes(48).toString('hex'), { mode: 0o600 });
+console.log('Created password, hash and session secret files (contents not printed).');
