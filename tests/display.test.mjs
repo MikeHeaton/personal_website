@@ -257,6 +257,22 @@ test("hourly quote is deterministic and the dry chart draws a visible blue zero 
   assert.equal(hourlyChart(dry, layout.chart, initial.serverTime).match(/stroke="#175a78" stroke-width="5"/g)?.length, 1);
 });
 
+test("rainfall axis uses a 0.25-inch baseline and expands with rounded headroom", () => {
+  const normal = hourlyChart(initial.weather, layout.chart, initial.serverTime);
+  assert.match(normal, />0\.25<\/text>/);
+
+  const wet = {
+    ...initial.weather,
+    twoDayHours: initial.weather.twoDayHours.map((hour, index) => ({
+      ...hour,
+      rain: index === 12 ? 0.31 : hour.rain,
+    })),
+  };
+  const expanded = hourlyChart(wet, layout.chart, initial.serverTime);
+  assert.match(expanded, />0\.40<\/text>/);
+  assert.doesNotMatch(expanded, />0\.25<\/text>/);
+});
+
 test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
   const chart = hourlyChart(initial.weather, layout.chart, initial.serverTime);
   assert.match(chart, /Today and tomorrow: 48 hourly/);
