@@ -7,12 +7,12 @@ Next.js website with a private Electric Objects dashboard at `/display`.
 The display is a server-rendered SVG 1.1 scene on a **1080 × 1920 design surface**. It scales uniformly to the browser viewport and requires no client JavaScript, external fonts, or canvas runtime. Only the server contacts Google Calendar and Open-Meteo.
 
 - `lib/display/drawing.mjs`: escaped text, rectangles, rules, equal-width columns, wrapped text, and the scalable surface.
-- `lib/display/scene.mjs`: named layout frames, palette/typography choices, deterministic hourly quotations, agenda lists, weather panels, and the hourly chart.
+- `lib/display/scene.mjs`: named layout frames, palette/typography choices, deterministic hourly quotations, agenda lists, weather panels, and the two alternating hourly charts.
 - `lib/display-page.mjs`: HTML document, password form, and automatic refresh.
 - `lib/display-calendar.mjs`: bounded iCalendar retrieval, recurrence expansion, overlap filtering, and caching.
 - `lib/display-data.mjs`: weather retrieval and independent refresh/cache clocks.
 
-Compose drawing primitives inside named frames and use design coordinates rather than screen pixels. The today/tomorrow agendas scroll with SVG `animateTransform` only when their clipped content is taller than the panel. Animation keyframes pause at both ends. Unsupported animation leaves the first entries visible as a static fallback.
+Compose drawing primitives inside named frames and use design coordinates rather than screen pixels. The today/tomorrow agendas scroll with SVG `animateTransform` only when their clipped content is taller than the panel. Animation keyframes pause at both ends. The weather chart area uses native SVG visibility animation to show the rolling 24-hour chart for 30 seconds and the local-midnight 48-hour today/tomorrow chart for 30 seconds. Unsupported animation leaves only the rolling chart visible, and unsupported agenda animation leaves the first entries visible.
 
 ## Calendar parser ecosystem fit
 
@@ -29,7 +29,7 @@ Before implementation, package metadata was checked for three maintained/minimal
 Set `GOOGLE_CALENDAR_ICAL_URL` only in local/deployment server environment configuration. It must be an HTTP(S) private iCal feed URL; never prefix it with `NEXT_PUBLIC_`, commit it, or log it.
 
 - Today and tomorrow use `America/Los_Angeles`, including recurring, all-day, overnight, and multiday events.
-- San Francisco current conditions and five-day forecast come from Open-Meteo in Fahrenheit and inches.
+- San Francisco current conditions and five-day forecast come from Open-Meteo in Fahrenheit and inches. Validated hourly data supplies both a rolling 24-hour window and exactly 48 local hourly points for today and tomorrow. The latter uses six-hour ticks, dated midnight labels, and a neutral elapsed-time mask; either dry window retains an explicit blue zero-inches line.
 - A deterministic local quotation rotates hourly without an external request.
 - The page refreshes every ten minutes on ten-minute boundaries. Weather and calendar successes are cached independently in ten-minute slots.
 - A weather failure retries once per minute; calendar and weather failures degrade independently.
@@ -38,7 +38,7 @@ Set `GOOGLE_CALENDAR_ICAL_URL` only in local/deployment server environment confi
 
 Use Node 24. Run `npm install`, `npm run dev`, `npm test`, and `npm run build`.
 
-Tests cover authentication, session expiry/revocation, refresh timing, no-JavaScript rendering, degraded weather, calendar recurrence and overlap behavior, escaping, bounded ingestion, conditional agenda scrolling, dry-rain rendering, and frame bounds. Verify the actual route at 1080 × 1920 and a narrow viewport with empty, normal, and overflow calendar fixtures. Then check the actual EO1 after it refreshes; modern-browser screenshots alone do not establish old-device compatibility.
+Tests cover authentication, session expiry/revocation, refresh timing, no-JavaScript rendering, degraded weather, calendar recurrence and overlap behavior, escaping, bounded ingestion, conditional agenda scrolling, both weather windows, the elapsed mask, six-hour ticks, 30-second native SVG alternation/fallback, dry-rain rendering, and frame bounds. Verify the actual route at 1080 × 1920 and a narrow viewport with empty, normal, and overflow calendar fixtures plus wet and dry weather fixtures. Confirm only the chart area alternates and no content clips or overlaps. Then check the actual EO1 after it refreshes; modern-browser screenshots alone do not establish old-device compatibility.
 
 ## Security and deployment
 

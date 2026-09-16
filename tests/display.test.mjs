@@ -13,6 +13,7 @@ import {
   hourSlot,
   nextHour,
   nextRefresh,
+  weather,
 } from "../lib/display-data.mjs";
 process.env.DISPLAY_PASSWORD_HASH = passwordHash("test-password");
 process.env.DISPLAY_SESSION_SECRET = "a".repeat(48);
@@ -66,6 +67,11 @@ const initial = {
       temperature: 60 + (i % 7),
       rain: i % 5 === 0 ? 0.04 : 0,
     })),
+    twoDayHours: Array.from({ length: 48 }, (_, i) => ({
+      time: `2026-09-${i < 24 ? "15" : "16"}T${String(i % 24).padStart(2, "0")}:00`,
+      temperature: 58 + (i % 11),
+      rain: i % 7 === 0 ? 0.03 : 0,
+    })),
     days: [{ date: "2026-09-15", code: 0, high: 70, low: 54, rain: 2 }],
   },
 };
@@ -80,7 +86,15 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   assert.match(html, /content="30;url=\/display"/);
   assert.match(html, /viewBox="0 0 1080 1920"/);
   assert.match(html, /id="hourly-chart"/);
+  assert.match(html, /id="next-24-hours-chart"/);
+  assert.match(html, /id="today-tomorrow-chart"/);
   assert.match(html, /NEXT 24 HOURS/);
+  assert.match(html, /TODAY \+ TOMORROW/);
+  assert.match(html, /id="elapsed-mask"/);
+  assert.match(html, /WED 9\/16/);
+  assert.match(html, /dur="60s" repeatCount="indefinite"/);
+  assert.match(html, /visibility="visible"/);
+  assert.match(html, /visibility="hidden"/);
   assert.match(html, /TEMPERATURE \(°F\)/);
   assert.match(html, /RAINFALL \(IN\)/);
   assert.match(html, /Last changed 2:58 PM/);
@@ -121,6 +135,47 @@ test("page refresh is aligned to ten-minute boundaries while hourly content stay
   assert.equal(refreshSeconds(now, true), 7 * 60);
   assert.equal(refreshSeconds(Date.parse("2026-09-15T21:30:00Z"), true), 10 * 60);
   assert.equal(hourSlot(now), hourSlot(nextRefresh(now)));
+});
+
+test("weather ingestion returns rolling 24-hour and local-midnight 48-hour windows", async () => {
+  const hourlyTime = Array.from({ length: 120 }, (_, index) => {
+    const day = 15 + Math.floor(index / 24);
+    const hour = index % 24;
+    return `2026-09-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00`;
+  });
+  const payload = {
+    current: { time: "2026-09-15T14:00", temperature_2m: 67, weather_code: 1 },
+    hourly: {
+      time: hourlyTime,
+      temperature_2m: hourlyTime.map((_, index) => 55 + index / 10),
+      precipitation: hourlyTime.map((_, index) => index % 9 ? 0 : 0.02),
+    },
+    daily: {
+      time: ["2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19"],
+      weather_code: [0, 1, 2, 3, 45],
+      temperature_2m_max: [70, 71, 72, 73, 74],
+      temperature_2m_min: [50, 51, 52, 53, 54],
+      precipitation_probability_max: [0, 10, 20, 30, 40],
+    },
+  };
+  const result = await weather(Date.parse("2026-09-15T21:05:00Z"), async (url) => {
+    assert.match(String(url), /timezone=America%2FLos_Angeles/);
+    return new Response(JSON.stringify(payload), { status: 200 });
+  });
+  assert.equal(result.hours.length, 24);
+  assert.equal(result.hours[0].time, "2026-09-15T14:00");
+  assert.equal(result.twoDayHours.length, 48);
+  assert.equal(result.twoDayHours[0].time, "2026-09-15T00:00");
+  assert.equal(result.twoDayHours[47].time, "2026-09-16T23:00");
+  const oversized = structuredClone(payload);
+  oversized.hourly.time = Array.from({ length: 169 }, (_, index) => `hour-${index}`);
+  oversized.hourly.temperature_2m = Array(169).fill(60);
+  oversized.hourly.precipitation = Array(169).fill(0);
+  await assert.rejects(
+    weather(Date.parse("2026-09-15T21:15:00Z"), async () =>
+      new Response(JSON.stringify(oversized), { status: 200 })),
+    /Incomplete forecast/,
+  );
 });
 
 import { columns, wrapLines } from "../lib/display/drawing.mjs";
@@ -200,10 +255,28 @@ test("only overflowing calendar lists receive native SVG scrolling with dwell po
   assert.match(scrollingPanel, /SCROLLING/);
 });
 
-test("hourly quote is deterministic and dry forecasts draw a visible blue zero line", () => {
+test("hourly quote is deterministic and both dry charts draw a visible blue zero line", () => {
   const now = Date.parse("2026-09-15T19:00:00Z");
   assert.deepEqual(quoteForHour(now), quoteForHour(now + 59 * 60 * 1000));
   assert.notDeepEqual(quoteForHour(now), quoteForHour(now + 60 * 60 * 1000));
-  const dry = { ...initial.weather, hours: initial.weather.hours.map((hour) => ({ ...hour, rain: 0 })) };
-  assert.match(hourlyChart(dry), /stroke="#175a78" stroke-width="5"/);
+  const dry = {
+    ...initial.weather,
+    hours: initial.weather.hours.map((hour) => ({ ...hour, rain: 0 })),
+    twoDayHours: initial.weather.twoDayHours.map((hour) => ({ ...hour, rain: 0 })),
+  };
+  assert.equal(hourlyChart(dry, layout.chart, initial.serverTime).match(/stroke="#175a78" stroke-width="5"/g)?.length, 2);
+});
+
+test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
+  const chart = hourlyChart(initial.weather, layout.chart, initial.serverTime);
+  assert.match(chart, /Today and tomorrow: 48 hourly/);
+  assert.match(chart, /fill="#6d716d" opacity="\.24"/);
+  assert.match(chart, /stroke="#555b57" stroke-width="3" stroke-dasharray="9 7"/);
+  for (const label of ["TUE 9/15", "WED 9/16", "THU 9/17"])
+    assert.match(chart, new RegExp(label));
+  assert.equal((chart.match(/>6a<\/text>/g) || []).length, 2);
+  assert.equal((chart.match(/>12p<\/text>/g) || []).length, 2);
+  assert.equal((chart.match(/>6p<\/text>/g) || []).length, 2);
+  assert.match(chart, /calcMode="discrete"[^>]*keyTimes="0;0\.499;0\.5;0\.999;1" dur="60s"/);
+  assert.doesNotMatch(chart, /<script/);
 });
