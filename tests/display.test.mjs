@@ -257,9 +257,9 @@ test("hourly quote is deterministic and the dry chart draws a visible blue zero 
   assert.equal(hourlyChart(dry, layout.chart, initial.serverTime).match(/stroke="#175a78" stroke-width="5"/g)?.length, 1);
 });
 
-test("rainfall axis uses a 0.25-inch baseline and expands with rounded headroom", () => {
+test("rainfall axis uses a 0.05-inch baseline and expands with rounded headroom", () => {
   const normal = hourlyChart(initial.weather, layout.chart, initial.serverTime);
-  assert.match(normal, />0\.25<\/text>/);
+  assert.match(normal, />0\.05<\/text>/);
 
   const wet = {
     ...initial.weather,
@@ -269,8 +269,8 @@ test("rainfall axis uses a 0.25-inch baseline and expands with rounded headroom"
     })),
   };
   const expanded = hourlyChart(wet, layout.chart, initial.serverTime);
-  assert.match(expanded, />0\.40<\/text>/);
-  assert.doesNotMatch(expanded, />0\.25<\/text>/);
+  assert.match(expanded, />0\.35<\/text>/);
+  assert.doesNotMatch(expanded, />0\.05<\/text>/);
 });
 
 test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
