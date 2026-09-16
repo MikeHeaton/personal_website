@@ -19,7 +19,7 @@ The current layout gives the weather a full-width band with bold sans-serif type
 
 - Four public-domain paintings from the Metropolitan Museum of Art. Provenance is in `lib/art.json`; image files are outside `public/` and served only after authentication.
 - San Francisco current conditions and five-day forecast in Fahrenheit from Open-Meteo.
-- **Forced page refresh every 60 seconds**, aligned to minute boundaries, for device iteration. Change `REFRESH_INTERVAL` to alter this.
+- **Forced page refresh every ten minutes**, aligned to ten-minute boundaries. Change `REFRESH_INTERVAL` to alter this. When weather is unavailable, the page retries once per minute until it recovers.
 - Artwork rotation remains hourly; weather is cached for ten minutes independently of page refresh.
 - A weather-service failure still renders the painting and retries on the next refresh. A complete network outage can interrupt page reloads.
 

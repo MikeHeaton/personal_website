@@ -12,7 +12,7 @@ The display contains:
 - A bold “Next 24 Hours” chart using an orange temperature line and blue rainfall bars. Temperature in °F uses the left axis; rainfall in inches uses the separate right axis.
 - A footer crediting The Metropolitan Museum of Art and Open-Meteo, plus `Last changed` showing the weather data refresh time in `America/Los_Angeles`.
 
-The authenticated HTML page refreshes at the next minute boundary. Artwork selection changes hourly, while successful weather responses are cached in ten-minute slots. If weather retrieval fails, the artwork still renders, the weather area reports that it is unavailable, and the next page refresh retries.
+The authenticated HTML page refreshes every ten minutes, aligned to ten-minute boundaries. Artwork selection changes hourly, while successful weather responses are cached in ten-minute slots. If weather retrieval fails, the artwork still renders, the weather area reports that it is unavailable, and the page retries once per minute until weather recovers.
 
 ## Implementation map
 

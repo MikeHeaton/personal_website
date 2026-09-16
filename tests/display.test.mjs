@@ -8,7 +8,12 @@ import {
   cookie,
   MAX_AGE,
 } from "../lib/display-auth.mjs";
-import { hourSlot, nextHour, nextRefresh } from "../lib/display-data.mjs";
+import {
+  REFRESH_INTERVAL,
+  hourSlot,
+  nextHour,
+  nextRefresh,
+} from "../lib/display-data.mjs";
 process.env.DISPLAY_PASSWORD_HASH = passwordHash("test-password");
 process.env.DISPLAY_SESSION_SECRET = "a".repeat(48);
 test("password verification rejects incorrect and malformed input", () => {
@@ -95,22 +100,21 @@ test("weather failure still renders art and retries promptly without JS", () => 
   assert.equal(refreshSeconds(Date.parse("2026-09-15T21:59:59.900Z"), true), 1);
 });
 
-test("forced HTML refresh remains active without JavaScript", () => {
-  assert.match(
-    displayPage(true, false, true, "test", initial),
-    /http-equiv="refresh" content="30;url=\/display"/,
-  );
-  assert.doesNotMatch(
-    displayPage(true, false, true, "test", initial),
-    /<script/,
-  );
+test("authenticated HTML refreshes every ten minutes without JavaScript", () => {
+  const html = displayPage(true, false, true, "test", {
+    ...initial,
+    serverTime: Date.parse("2026-09-15T21:30:00Z"),
+  });
+  assert.match(html, /http-equiv="refresh" content="600;url=\/display"/);
+  assert.doesNotMatch(html, /<script/);
 });
 
-test("refresh is aligned to sixty seconds while artwork remains hourly", () => {
+test("page refresh is aligned to ten-minute boundaries while artwork remains hourly", () => {
   const now = Date.parse("2026-09-15T21:23:00Z");
-  assert.equal(nextRefresh(now), Date.parse("2026-09-15T21:24:00Z"));
-  assert.equal(refreshSeconds(now, true), 60);
-  assert.equal(refreshSeconds(Date.parse("2026-09-15T21:30:00Z"), true), 60);
+  assert.equal(REFRESH_INTERVAL, 10 * 60 * 1000);
+  assert.equal(nextRefresh(now), Date.parse("2026-09-15T21:30:00Z"));
+  assert.equal(refreshSeconds(now, true), 7 * 60);
+  assert.equal(refreshSeconds(Date.parse("2026-09-15T21:30:00Z"), true), 10 * 60);
   assert.equal(hourSlot(now), hourSlot(nextRefresh(now)));
 });
 
