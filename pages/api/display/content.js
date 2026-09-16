@@ -8,5 +8,5 @@ export default async function handler(req, res) {
   const art = artworks[hourSlot(now) % artworks.length];
   let forecast = null;
   try { forecast = await weather(now); } catch { /* Client preserves last successful forecast and retries. */ }
-  res.json({ art, weather: forecast, serverTime: now, nextUpdate: nextHour(now) });
+  res.json({ art, weather: forecast, serverTime: Date.now(), nextUpdate: nextHour(now) });
 }
