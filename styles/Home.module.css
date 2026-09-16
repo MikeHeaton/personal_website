@@ -1,436 +1,91 @@
 .container {
   min-height: 100vh;
-  color: #f7fbff;
-  background:
-    radial-gradient(circle at 86% 4%, rgba(35, 138, 190, 0.35), transparent 34rem),
-    linear-gradient(145deg, #071421 0%, #0b2434 52%, #0c3141 100%);
-}
-
-.main {
-  width: min(1180px, calc(100% - 40px));
-  min-width: 0;
-  margin: 0 auto;
-  padding: 42px 0 32px;
-}
-
-.header {
+  padding: 0 0.5rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
-  margin-bottom: 28px;
-}
-
-.header > div {
-  min-width: 0;
-}
-
-.header h1 {
-  font-size: clamp(3.2rem, 8vw, 6.8rem);
-  line-height: 0.92;
-  letter-spacing: -0.065em;
-}
-
-.eyebrow {
-  margin-bottom: 9px;
-  color: #7ed9ff;
-  font-size: 0.9rem;
-  font-weight: 800;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-.intro {
-  margin-top: 16px;
-  color: #c0d2dd;
-  font-size: clamp(1rem, 2vw, 1.3rem);
-  font-weight: 600;
-}
-
-.profileImage {
-  width: clamp(120px, 17vw, 200px);
-  aspect-ratio: 1;
-  flex: 0 0 auto;
-  border: 5px solid rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
-}
-
-.weatherSummary,
-.forecastCard {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid rgba(163, 215, 235, 0.22);
-  border-radius: 24px;
-  background: rgba(5, 20, 31, 0.76);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(14px);
-}
-
-.weatherSummary {
-  display: grid;
-  grid-template-columns: minmax(190px, 1.2fr) auto minmax(260px, 1fr);
-  align-items: center;
-  gap: 40px;
-  overflow: hidden;
-  margin-bottom: 20px;
-  padding: 24px 30px;
-}
-
-.weatherSummary h2,
-.chartHeading h2 {
-  font-size: clamp(1.65rem, 3vw, 2.45rem);
-  line-height: 1;
-  letter-spacing: -0.03em;
-}
-
-.condition {
-  margin-top: 9px;
-  color: #bdced8;
-  font-size: 1.15rem;
-  font-weight: 650;
-}
-
-.currentTemperature {
-  color: #ffffff;
-  font-size: clamp(4rem, 8vw, 6.2rem);
-  font-weight: 850;
-  line-height: 0.9;
-  letter-spacing: -0.07em;
-}
-
-.currentTemperature span {
-  color: #ffb457;
-  font-size: 0.4em;
-  letter-spacing: -0.02em;
-  vertical-align: top;
-}
-
-.weatherDetails {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-}
-
-.weatherDetails div {
-  min-width: 0;
-  padding-left: 14px;
-  border-left: 3px solid #2098c8;
-}
-
-.weatherDetails dt {
-  color: #a9c0cc;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.weatherDetails dd {
-  margin: 5px 0 0;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.forecastCard {
-  overflow: hidden;
-  padding: 28px 22px 16px;
-}
-
-.chartHeading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 12px 10px;
-}
-
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 12px 24px;
-  color: #eef8fc;
-  font-size: 1rem;
-  font-weight: 800;
-}
-
-.legend span {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.legend i {
-  display: inline-block;
-  width: 30px;
-}
-
-.temperatureKey {
-  height: 5px;
-  border-radius: 99px;
-  background: #ffad42;
-  box-shadow: 0 0 0 2px #4e2500;
-}
-
-.rainKey {
-  height: 17px;
-  border-radius: 3px 3px 0 0;
-  background: #31bdf6;
-}
-
-.chartScroller {
-  width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-}
-
-.chart {
-  display: block;
-  width: 100%;
-  min-width: 720px;
-  height: auto;
-  font-family: inherit;
-}
-
-.gridLine {
-  stroke: rgba(197, 226, 239, 0.18);
-  stroke-width: 2;
-}
-
-.tickLine {
-  stroke: rgba(197, 226, 239, 0.52);
-  stroke-width: 2;
-}
-
-.axisTitle {
-  fill: #dceaf0;
-  font-size: 18px;
-  font-weight: 850;
-  letter-spacing: 0.02em;
-}
-
-.axisLabel,
-.timeLabel {
-  fill: #dceaf0;
-  font-size: 18px;
-  font-weight: 750;
-}
-
-.nowLabel {
-  fill: #7ed9ff;
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.rainBar {
-  fill: #31bdf6;
-  opacity: 0.85;
-}
-
-.temperatureLineShadow {
-  fill: none;
-  stroke: #3c1c00;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 11;
-}
-
-.temperatureLine {
-  fill: none;
-  stroke: #ffad42;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 7;
-}
-
-.temperaturePoint {
-  fill: #fff3df;
-  stroke: #b05c00;
-  stroke-width: 4;
-}
-
-.loadingMessage {
-  min-height: 290px;
-  display: grid;
-  place-items: center;
-  color: #c7d8e0;
-  font-size: 1.25rem;
-  font-weight: 750;
-}
-
-.updateRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 18px;
-  padding: 14px 8px 2px;
-  color: #9eb6c2;
-  font-size: 0.85rem;
-  font-weight: 650;
-}
-
-.updateRow button {
-  padding: 7px 13px;
-  border: 1px solid rgba(126, 217, 255, 0.5);
-  border-radius: 999px;
-  color: #c8edff;
-  background: transparent;
-  cursor: pointer;
-}
-
-.updateRow button:hover,
-.updateRow button:focus-visible {
-  color: #071421;
-  background: #7ed9ff;
-  outline: none;
-}
-
-.contacts {
-  display: flex;
+  flex-direction: column;
   justify-content: center;
-  gap: 22px;
-  margin-top: 26px;
+  align-items: center;
 }
 
-.contacts a {
-  width: 46px;
-  border-radius: 50%;
-  opacity: 0.82;
-  transition: opacity 120ms ease, transform 120ms ease;
+.title a {
+  color: #0070f3;
+  text-decoration: none;
 }
 
-.contacts a:hover,
-.contacts a:focus-visible {
-  opacity: 1;
-  outline: 3px solid #7ed9ff;
-  outline-offset: 4px;
-  transform: translateY(-2px);
+.title a:hover,
+.title a:focus,
+.title a:active {
+  text-decoration: underline;
 }
 
-.contacts img {
-  display: block;
+.title {
+  margin: 0 0 1rem;
+  line-height: 1.15;
+  font-size: 3.6rem;
 }
 
-@media (max-width: 760px) {
-  .main {
-    width: min(100% - 24px, 1180px);
-    padding-top: 24px;
-  }
+.title {
+  text-align: center;
+}
 
-  .header {
-    align-items: flex-start;
-    gap: 18px;
-    margin-bottom: 20px;
-  }
+.title,
+.description {
+  text-align: center;
+}
 
-  .header h1 {
-    font-size: clamp(3rem, 14vw, 5rem);
-  }
 
-  .intro {
-    max-width: 18rem;
-  }
+.description {
+  line-height: 1.5;
+  font-size: 1.5rem;
+}
 
-  .profileImage {
-    width: clamp(92px, 25vw, 130px);
-    border-width: 3px;
-  }
+.grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
 
-  .weatherSummary {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-    padding: 22px;
-  }
+  max-width: 800px;
+  margin-top: 3rem;
+}
 
-  .currentTemperature {
-    font-size: 4.7rem;
-  }
+.card {
+  margin: 1rem;
+  flex-basis: 45%;
+  padding: 1.5rem;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid #eaeaea;
+  border-radius: 10px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
 
-  .weatherDetails {
-    grid-column: 1;
+.card:hover,
+.card:focus,
+.card:active {
+  color: #0070f3;
+  border-color: #0070f3;
+}
+
+.card h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+}
+
+.card p {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.logo {
+  height: 1em;
+}
+
+@media (max-width: 600px) {
+  .grid {
     width: 100%;
-  }
-
-  .forecastCard {
-    padding: 22px 8px 8px;
-    border-radius: 20px;
-  }
-
-  .chartHeading {
-    align-items: flex-start;
-    padding-inline: 14px;
     flex-direction: column;
-  }
-
-  .legend {
-    justify-content: flex-start;
-  }
-
-  .chart {
-    width: 760px;
-  }
-
-  .updateRow {
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 430px) {
-  .header {
-    position: relative;
-    min-height: 235px;
-    padding-right: 82px;
-    overflow: hidden;
-  }
-
-  .header h1 {
-    font-size: 3rem;
-  }
-
-  .profileImage {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 76px;
-  }
-
-  .eyebrow {
-    font-size: 0.72rem;
-  }
-
-  .intro {
-    display: none;
-  }
-
-  .weatherSummary {
-    gap: 16px 10px;
-  }
-
-  .currentTemperature {
-    font-size: 3.5rem;
-  }
-
-  .weatherDetails {
-    gap: 6px;
-  }
-
-  .weatherDetails div {
-    padding-left: 8px;
-  }
-
-  .weatherDetails dt {
-    font-size: 0.61rem;
-  }
-
-  .weatherDetails dd {
-    font-size: 0.9rem;
-    white-space: normal;
   }
 }
