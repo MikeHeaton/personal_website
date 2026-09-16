@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { passwordHash, verifyPassword, createSession, validSession, cookie, MAX_AGE } from '../lib/display-auth.mjs';
-import { hourSlot, nextHour } from '../lib/display-data.mjs';
+import { hourSlot, nextHour, nextRefresh } from '../lib/display-data.mjs';
 process.env.DISPLAY_PASSWORD_HASH = passwordHash('test-password');
 process.env.DISPLAY_SESSION_SECRET = 'a'.repeat(48);
 test('password verification rejects incorrect and malformed input', () => {
@@ -60,4 +60,12 @@ import { clientScript } from '../lib/display-client.mjs';
 test('forced HTML refresh remains active alongside JavaScript updates', () => {
   assert.match(displayPage(true, false, true, 'test', initial), /http-equiv="refresh" content="30;url=\/display"/);
   assert.doesNotMatch(clientScript, /removeChild|refresh-fallback/);
+});
+
+test('refresh is aligned to ten minutes while artwork remains hourly', () => {
+  const now = Date.parse('2026-09-15T21:23:00Z');
+  assert.equal(nextRefresh(now), Date.parse('2026-09-15T21:30:00Z'));
+  assert.equal(refreshSeconds(now, true), 420);
+  assert.equal(refreshSeconds(Date.parse('2026-09-15T21:30:00Z'), true), 600);
+  assert.equal(hourSlot(now), hourSlot(nextRefresh(now)));
 });

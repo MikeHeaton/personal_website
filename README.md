@@ -6,8 +6,8 @@ Next.js website with a private Electric Objects display at `/display`.
 
 - Public-domain paintings from the Metropolitan Museum of Art, served through authenticated image routes. Provenance lives in `lib/art.json`; images are outside `public/`.
 - Current San Francisco conditions and five-day forecast in Fahrenheit, from Open-Meteo.
-- Artwork rotates every clock hour. A server-clock-aligned timer fetches content on the hour; visibility/network recovery and a watchdog catch missed updates. Failed requests retry after a minute and retain already displayed content.
-- Initial artwork, date, and weather are rendered on the server. The page works without JavaScript; an HTML refresh targets the next hour (or retries within a minute if weather is unavailable). A forced HTML refresh remains active on every browser, even when the same-origin ES5 script is also fetching updates. No museum or weather requests originate from the device.
+- Artwork rotates every clock hour. A server-clock-aligned timer fetches content every ten minutes; visibility/network recovery and a watchdog catch missed updates. Failed requests retry after a minute and retain already displayed content.
+- Initial artwork, date, and weather are rendered on the server. The page works without JavaScript; an HTML refresh targets the next ten-minute boundary (or retries within a minute if weather is unavailable). A forced HTML refresh remains active on every browser, even when the same-origin ES5 script is also fetching updates. No museum or weather requests originate from the device.
 - Plain HTML, CSS and ES5 JavaScript avoid requiring React hydration or modern browser APIs on the E01.
 
 ## Development
