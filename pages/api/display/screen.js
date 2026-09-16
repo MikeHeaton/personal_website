@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { authenticated, configured, secureHeaders } from '../../../lib/display-auth.mjs';
 import { displayPage } from '../../../lib/display-page.mjs';
-import { hourSlot, weather } from '../../../lib/display-data.mjs';
-import artworks from '../../../lib/art.json';
+import { weather } from '../../../lib/display-data.mjs';
+import { calendar } from '../../../lib/display-calendar.mjs';
 export default async function handler(req, res) {
   secureHeaders(res);
   if (req.method !== 'GET') return res.status(405).end();
@@ -12,10 +12,12 @@ export default async function handler(req, res) {
   const signedIn = authenticated(req);
   let initial = null;
   if (signedIn) {
-    let forecast = null;
-    try { forecast = await weather(); } catch { /* Art still renders; HTML refresh retries weather. */ }
     const now = Date.now();
-    initial = { art: artworks[hourSlot(now) % artworks.length], weather: forecast, serverTime: now };
+    const [forecast, agenda] = await Promise.all([
+      weather(now).catch(() => null),
+      calendar(now).catch(() => null),
+    ]);
+    initial = { calendar: agenda, weather: forecast, serverTime: now };
   }
   res.send(displayPage(signedIn, req.query.error === '1', configured(), nonce, initial));
 }

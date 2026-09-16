@@ -46,12 +46,15 @@ test("rotation occurs at the hour and scheduling always targets the next boundar
 import { displayPage, refreshSeconds } from "../lib/display-page.mjs";
 const initial = {
   serverTime: Date.parse("2026-09-15T21:59:30Z"),
-  art: {
-    id: 436535,
-    title: "<Painting>",
-    artist_title: "Artist & Co",
-    date_display: "1889",
-    source: "https://www.metmuseum.org/art/collection/search/436535",
+  calendar: {
+    days: [
+      {
+        key: "2026-09-15",
+        label: "TODAY",
+        events: [{ id: "one", title: "Dentist <check>", location: "", allDay: false, start: Date.parse("2026-09-15T22:00:00Z"), end: Date.parse("2026-09-15T23:00:00Z") }],
+      },
+      { key: "2026-09-16", label: "TOMORROW", events: [] },
+    ],
   },
   weather: {
     temperature: 67,
@@ -66,14 +69,15 @@ const initial = {
     days: [{ date: "2026-09-15", code: 0, high: 70, low: 54, rain: 2 }],
   },
 };
-test("initial HTML contains artwork and forecast without executing JavaScript", () => {
+test("initial HTML contains calendar and forecast without artwork or JavaScript", () => {
   const html = displayPage(true, false, true, "test", initial);
-  assert.match(html, /xlink:href="\/api\/display\/art\?id=436535"/);
+  assert.match(html, /id="calendar"/);
+  assert.match(html, /Dentist &lt;check&gt;/);
+  assert.match(html, /Nothing scheduled/);
+  assert.doesNotMatch(html, /id="artwork"|\/api\/display\/art/);
   assert.match(html, />67°<\/text>/);
   assert.match(html, /70°/);
   assert.match(html, /content="30;url=\/display"/);
-  assert.match(html, /&lt;Painting&gt;/);
-  assert.match(html, /Artist &amp; Co/);
   assert.match(html, /viewBox="0 0 1080 1920"/);
   assert.match(html, /id="hourly-chart"/);
   assert.match(html, /NEXT 24 HOURS/);
@@ -85,15 +89,15 @@ test("initial HTML contains artwork and forecast without executing JavaScript", 
 });
 test("logged-out HTML contains no private content or automatic refresh", () => {
   const html = displayPage(false, false, true, "test", initial);
-  assert.doesNotMatch(html, /436535|temperature|http-equiv="refresh"/);
+  assert.doesNotMatch(html, /Dentist|temperature|http-equiv="refresh"/);
   assert.match(html, /Welcome home/);
 });
-test("weather failure still renders art and retries promptly without JS", () => {
+test("weather failure still renders calendar and retries promptly without JS", () => {
   const html = displayPage(true, false, true, "test", {
     ...initial,
     weather: null,
   });
-  assert.match(html, /xlink:href="\/api\/display\/art\?id=436535"/);
+  assert.match(html, /Dentist &lt;check&gt;/);
   assert.match(html, /Weather unavailable/);
   assert.doesNotMatch(html, /Last changed/);
   assert.equal(refreshSeconds(Date.parse("2026-09-15T21:20:00Z"), false), 60);
@@ -109,7 +113,7 @@ test("authenticated HTML refreshes every ten minutes without JavaScript", () => 
   assert.doesNotMatch(html, /<script/);
 });
 
-test("page refresh is aligned to ten-minute boundaries while artwork remains hourly", () => {
+test("page refresh is aligned to ten-minute boundaries while hourly content stays stable", () => {
   const now = Date.parse("2026-09-15T21:23:00Z");
   assert.equal(REFRESH_INTERVAL, 10 * 60 * 1000);
   assert.equal(nextRefresh(now), Date.parse("2026-09-15T21:30:00Z"));
@@ -119,7 +123,13 @@ test("page refresh is aligned to ten-minute boundaries while artwork remains hou
 });
 
 import { columns, wrapLines } from "../lib/display/drawing.mjs";
-import { layout } from "../lib/display/scene.mjs";
+import {
+  calendarDayPanel,
+  hourlyChart,
+  layout,
+  quoteForHour,
+} from "../lib/display/scene.mjs";
+import { calendar, parseCalendar } from "../lib/display-calendar.mjs";
 test("forecast columns fill their frame evenly and every panel stays on the canvas", () => {
   const cells = columns(layout.forecast, 5);
   assert.equal(cells.length, 5);
@@ -135,8 +145,64 @@ test("forecast columns fill their frame evenly and every panel stays on the canv
     assert.ok(frame.y + frame.height <= layout.canvas.height);
   }
 });
-test("long artwork titles stay within the reserved caption lines", () => {
-  const lines = wrapLines("A long artwork title ".repeat(20), 48, 2);
+test("wrapped labels stay within their reserved lines", () => {
+  const lines = wrapLines("A long calendar title ".repeat(20), 48, 2);
   assert.equal(lines.length, 2);
   assert.ok(lines[1].endsWith("…"));
+});
+
+const calendarFixture = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tests//Display//EN\r\nBEGIN:VEVENT\r\nUID:all-day\r\nDTSTART;VALUE=DATE:20260915\r\nDTEND;VALUE=DATE:20260917\r\nSUMMARY:Trip\\, family\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:recurring\r\nDTSTART:20260914T160000\r\nDTEND:20260914T170000\r\nRRULE:FREQ=DAILY;COUNT=4\r\nEXDATE:20260916T160000\r\nSUMMARY:Daily stand-up\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:recurring\r\nRECURRENCE-ID:20260915T160000\r\nDTSTART:20260915T180000\r\nDTEND:20260915T190000\r\nSUMMARY:Moved stand-up\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:overnight\r\nDTSTART:20260916T063000Z\r\nDTEND:20260916T083000Z\r\nSUMMARY:Late shift\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+
+test("calendar parsing expands recurrence and includes all-day and multiday overlaps", () => {
+  const parsed = parseCalendar(calendarFixture, Date.parse("2026-09-15T19:00:00Z"));
+  assert.deepEqual(parsed.days.map(({ key }) => key), ["2026-09-15", "2026-09-16"]);
+  assert.deepEqual(
+    parsed.days[0].events.map(({ title }) => title),
+    ["Trip, family", "Moved stand-up", "Late shift"],
+  );
+  assert.deepEqual(parsed.days[1].events.map(({ title }) => title), ["Trip, family", "Late shift"]);
+  assert.equal(parsed.days[0].events[0].allDay, true);
+  assert.equal(
+    parsed.days[0].events.find(({ title }) => title === "Moved stand-up").start,
+    Date.parse("2026-09-16T01:00:00Z"),
+  );
+});
+
+test("calendar ingestion is server-configured, bounded, and fails without leaking its URL", async () => {
+  const previous = process.env.GOOGLE_CALENDAR_ICAL_URL;
+  process.env.GOOGLE_CALENDAR_ICAL_URL = ["https:", "", "calendar.invalid", "redacted", "basic.ics"].join("/");
+  const value = await calendar(Date.parse("2026-09-15T19:01:00Z"), async (url, options) => {
+    assert.equal(url, process.env.GOOGLE_CALENDAR_ICAL_URL);
+    assert.equal(options.cache, "no-store");
+    return new Response(calendarFixture, { status: 200 });
+  });
+  assert.equal(value.days.length, 2);
+  await assert.rejects(
+    calendar(Date.parse("2026-09-15T19:11:00Z"), async () => new Response("no", { status: 503 })),
+    (error) => !String(error).includes("calendar.invalid"),
+  );
+  if (previous === undefined) delete process.env.GOOGLE_CALENDAR_ICAL_URL;
+  else process.env.GOOGLE_CALENDAR_ICAL_URL = previous;
+  assert.throws(() => parseCalendar("x".repeat(1024 * 1024 + 1)), /too large/);
+});
+
+test("only overflowing calendar lists receive native SVG scrolling with dwell points", () => {
+  const frame = { x: 0, y: 0, width: 480, height: 466 };
+  const staticPanel = calendarDayPanel({ key: "2026-09-15", label: "TODAY", events: [] }, frame, 0);
+  assert.doesNotMatch(staticPanel, /animateTransform|SCROLLING/);
+  const events = Array.from({ length: 8 }, (_, index) => ({
+    id: String(index), title: `Event ${index}`, allDay: true, start: 0, end: 1,
+  }));
+  const scrollingPanel = calendarDayPanel({ key: "2026-09-15", label: "TODAY", events }, frame, 0);
+  assert.match(scrollingPanel, /<animateTransform/);
+  assert.match(scrollingPanel, /keyTimes="0;0\.18;0\.48;0\.78;1"/);
+  assert.match(scrollingPanel, /SCROLLING/);
+});
+
+test("hourly quote is deterministic and dry forecasts draw a visible blue zero line", () => {
+  const now = Date.parse("2026-09-15T19:00:00Z");
+  assert.deepEqual(quoteForHour(now), quoteForHour(now + 59 * 60 * 1000));
+  assert.notDeepEqual(quoteForHour(now), quoteForHour(now + 60 * 60 * 1000));
+  const dry = { ...initial.weather, hours: initial.weather.hours.map((hour) => ({ ...hour, rain: 0 })) };
+  assert.match(hourlyChart(dry), /stroke="#175a78" stroke-width="5"/);
 });
