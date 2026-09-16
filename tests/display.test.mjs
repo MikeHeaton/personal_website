@@ -13,6 +13,7 @@ import {
   hourSlot,
   nextHour,
   nextRefresh,
+  parseSunTimes,
   weather,
 } from "../lib/display-data.mjs";
 process.env.DISPLAY_PASSWORD_HASH = passwordHash("test-password");
@@ -67,6 +68,10 @@ const initial = {
       temperature: 58 + (i % 11),
       rain: i % 7 === 0 ? 0.03 : 0,
     })),
+    sunTimes: [
+      { date: "2026-09-15", sunrise: "2026-09-15T06:52", sunset: "2026-09-15T19:15" },
+      { date: "2026-09-16", sunrise: "2026-09-16T06:53", sunset: "2026-09-16T19:13" },
+    ],
     days: [{ date: "2026-09-15", code: 0, high: 70, low: 54, rain: 2 }],
   },
 };
@@ -86,6 +91,9 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   assert.match(html, /id="elapsed-mask"/);
   assert.match(html, /WED 9\/16/);
   assert.match(html, /id="day-divider"/);
+  assert.equal((html.match(/class="solar-marker"/g) || []).length, 4);
+  assert.match(html, /☀︎ 6:52 AM/);
+  assert.match(html, /☾ 7:13 PM/);
   assert.doesNotMatch(html, /attributeName="visibility"|dur="60s"/);
   assert.match(html, /TEMPERATURE \(°F\)/);
   assert.match(html, /RAINFALL \(IN\)/);
@@ -144,6 +152,8 @@ test("weather ingestion returns the local-midnight 48-hour window without rollin
     },
     daily: {
       time: ["2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19"],
+      sunrise: ["2026-09-15T06:52", "2026-09-16T06:53", "2026-09-17T06:54", "2026-09-18T06:55", "2026-09-19T06:56"],
+      sunset: ["2026-09-15T19:15", "2026-09-16T19:13", "2026-09-17T19:12", "2026-09-18T19:10", "2026-09-19T19:09"],
       weather_code: [0, 1, 2, 3, 45],
       temperature_2m_max: [70, 71, 72, 73, 74],
       temperature_2m_min: [50, 51, 52, 53, 54],
@@ -151,6 +161,7 @@ test("weather ingestion returns the local-midnight 48-hour window without rollin
     },
   };
   const result = await weather(Date.parse("2026-09-15T21:05:00Z"), async (url) => {
+    assert.match(String(url), /daily=[^&]*sunrise,sunset/);
     assert.match(String(url), /timezone=America%2FLos_Angeles/);
     return new Response(JSON.stringify(payload), { status: 200 });
   });
@@ -158,6 +169,10 @@ test("weather ingestion returns the local-midnight 48-hour window without rollin
   assert.equal(result.twoDayHours.length, 48);
   assert.equal(result.twoDayHours[0].time, "2026-09-15T00:00");
   assert.equal(result.twoDayHours[47].time, "2026-09-16T23:00");
+  assert.deepEqual(result.sunTimes, [
+    { date: "2026-09-15", sunrise: "2026-09-15T06:52", sunset: "2026-09-15T19:15" },
+    { date: "2026-09-16", sunrise: "2026-09-16T06:53", sunset: "2026-09-16T19:13" },
+  ]);
   const oversized = structuredClone(payload);
   oversized.hourly.time = Array.from({ length: 169 }, (_, index) => `hour-${index}`);
   oversized.hourly.temperature_2m = Array(169).fill(60);
@@ -167,6 +182,27 @@ test("weather ingestion returns the local-midnight 48-hour window without rollin
       new Response(JSON.stringify(oversized), { status: 200 })),
     /Incomplete forecast/,
   );
+  const withoutSolarData = structuredClone(payload);
+  delete withoutSolarData.daily.sunrise;
+  delete withoutSolarData.daily.sunset;
+  const fallback = await weather(Date.parse("2026-09-15T21:25:00Z"), async () =>
+    new Response(JSON.stringify(withoutSolarData), { status: 200 }));
+  assert.deepEqual(fallback.sunTimes, [
+    { date: "2026-09-15", sunrise: null, sunset: null },
+    { date: "2026-09-16", sunrise: null, sunset: null },
+  ]);
+});
+
+test("solar data parsing accepts only the displayed local dates and valid local times", () => {
+  const parsed = parseSunTimes({
+    time: ["2026-09-14", "2026-09-15", "2026-09-16"],
+    sunrise: ["2026-09-14T06:51", "2026-09-15T06:52", "wrong-dateT06:53"],
+    sunset: ["2026-09-14T19:16", "2026-09-15T19:15", "2026-09-16T25:00"],
+  }, "2026-09-15");
+  assert.deepEqual(parsed, [
+    { date: "2026-09-15", sunrise: "2026-09-15T06:52", sunset: "2026-09-15T19:15" },
+    { date: "2026-09-16", sunrise: null, sunset: null },
+  ]);
 });
 
 import { columns, wrapLines } from "../lib/display/drawing.mjs";
@@ -174,7 +210,9 @@ import {
   calendarDayPanel,
   hourlyChart,
   layout,
+  interpolateTemperatureAtHour,
   quoteForHour,
+  solarEventOffsetHours,
   temperatureAxisBounds,
 } from "../lib/display/scene.mjs";
 import { calendar, parseCalendar } from "../lib/display-calendar.mjs";
@@ -295,6 +333,36 @@ test("temperature axis bounds retain padding and always use multiples of 10°F",
   const chart = hourlyChart(initial.weather, layout.chart, initial.serverTime);
   assert.match(chart, />50°<\/text>/);
   assert.match(chart, />70°<\/text>/);
+});
+
+test("solar marker offsets and temperature interpolation preserve fractional local times", () => {
+  assert.equal(solarEventOffsetHours("2026-09-15", "2026-09-15T06:30"), 6.5);
+  assert.equal(solarEventOffsetHours("2026-09-15", "2026-09-16T18:15"), 42.25);
+  assert.equal(solarEventOffsetHours("2026-09-15", "2026-09-17T06:30"), null);
+  assert.equal(interpolateTemperatureAtHour([{ temperature: 50 }, { temperature: 58 }], 0.25), 52);
+  assert.equal(interpolateTemperatureAtHour([{ temperature: 50 }, { temperature: null }], 0.25), null);
+});
+
+test("two-day weather chart positions and labels all four solar markers with a graceful fallback", () => {
+  const weather = {
+    ...initial.weather,
+    twoDayHours: initial.weather.twoDayHours.map((hour, index) => ({ ...hour, temperature: 50 + index })),
+    sunTimes: [
+      { date: "2026-09-15", sunrise: "2026-09-15T06:30", sunset: "2026-09-15T18:45" },
+      { date: "2026-09-16", sunrise: "2026-09-16T06:45", sunset: "2026-09-16T18:15" },
+    ],
+  };
+  const chart = hourlyChart(weather, layout.chart, initial.serverTime);
+  assert.equal((chart.match(/class="solar-marker"/g) || []).length, 4);
+  assert.equal((chart.match(/data-kind="sunrise"/g) || []).length, 2);
+  assert.equal((chart.match(/data-kind="sunset"/g) || []).length, 2);
+  assert.match(chart, /data-hour="6\.500"[^>]*aria-label="Sunrise 6:30 AM"/);
+  assert.match(chart, /data-hour="42\.250"[^>]*aria-label="Sunset 6:15 PM"/);
+  assert.match(chart, /<line x1="245\.4"[^>]*x2="245\.4"[^>]*stroke="#16251c" stroke-width="2"/);
+  assert.match(chart, /☀︎ 6:30 AM/);
+  assert.match(chart, /☾ 6:15 PM/);
+  assert.doesNotMatch(hourlyChart({ ...weather, sunTimes: undefined }, layout.chart, initial.serverTime), /class="solar-marker"/);
+  assert.doesNotMatch(hourlyChart({ ...weather, sunTimes: [{ date: "2026-09-15", sunrise: null, sunset: "bad" }] }, layout.chart, initial.serverTime), /class="solar-marker"/);
 });
 
 test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
