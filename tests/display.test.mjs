@@ -62,11 +62,6 @@ const initial = {
     code: 0,
     label: "Clear skies",
     updatedAt: Date.parse("2026-09-15T21:58:00Z"),
-    hours: Array.from({ length: 24 }, (_, i) => ({
-      time: `2026-09-${i < 3 ? "15" : "16"}T${String((21 + i) % 24).padStart(2, "0")}:00`,
-      temperature: 60 + (i % 7),
-      rain: i % 5 === 0 ? 0.04 : 0,
-    })),
     twoDayHours: Array.from({ length: 48 }, (_, i) => ({
       time: `2026-09-${i < 24 ? "15" : "16"}T${String(i % 24).padStart(2, "0")}:00`,
       temperature: 58 + (i % 11),
@@ -86,15 +81,12 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   assert.match(html, /content="30;url=\/display"/);
   assert.match(html, /viewBox="0 0 1080 1920"/);
   assert.match(html, /id="hourly-chart"/);
-  assert.match(html, /id="next-24-hours-chart"/);
-  assert.match(html, /id="today-tomorrow-chart"/);
-  assert.match(html, /NEXT 24 HOURS/);
+  assert.doesNotMatch(html, /id="next-24-hours-chart"|NEXT 24 HOURS/);
   assert.match(html, /TODAY \+ TOMORROW/);
   assert.match(html, /id="elapsed-mask"/);
   assert.match(html, /WED 9\/16/);
-  assert.match(html, /dur="60s" repeatCount="indefinite"/);
-  assert.match(html, /visibility="visible"/);
-  assert.match(html, /visibility="hidden"/);
+  assert.match(html, /id="day-divider"/);
+  assert.doesNotMatch(html, /attributeName="visibility"|dur="60s"/);
   assert.match(html, /TEMPERATURE \(°F\)/);
   assert.match(html, /RAINFALL \(IN\)/);
   assert.match(html, /Last changed 2:58 PM/);
@@ -137,7 +129,7 @@ test("page refresh is aligned to ten-minute boundaries while hourly content stay
   assert.equal(hourSlot(now), hourSlot(nextRefresh(now)));
 });
 
-test("weather ingestion returns rolling 24-hour and local-midnight 48-hour windows", async () => {
+test("weather ingestion returns the local-midnight 48-hour window without rolling data", async () => {
   const hourlyTime = Array.from({ length: 120 }, (_, index) => {
     const day = 15 + Math.floor(index / 24);
     const hour = index % 24;
@@ -162,8 +154,7 @@ test("weather ingestion returns rolling 24-hour and local-midnight 48-hour windo
     assert.match(String(url), /timezone=America%2FLos_Angeles/);
     return new Response(JSON.stringify(payload), { status: 200 });
   });
-  assert.equal(result.hours.length, 24);
-  assert.equal(result.hours[0].time, "2026-09-15T14:00");
+  assert.equal("hours" in result, false);
   assert.equal(result.twoDayHours.length, 48);
   assert.equal(result.twoDayHours[0].time, "2026-09-15T00:00");
   assert.equal(result.twoDayHours[47].time, "2026-09-16T23:00");
@@ -255,16 +246,15 @@ test("only overflowing calendar lists receive native SVG scrolling with dwell po
   assert.match(scrollingPanel, /SCROLLING/);
 });
 
-test("hourly quote is deterministic and both dry charts draw a visible blue zero line", () => {
+test("hourly quote is deterministic and the dry chart draws a visible blue zero line", () => {
   const now = Date.parse("2026-09-15T19:00:00Z");
   assert.deepEqual(quoteForHour(now), quoteForHour(now + 59 * 60 * 1000));
   assert.notDeepEqual(quoteForHour(now), quoteForHour(now + 60 * 60 * 1000));
   const dry = {
     ...initial.weather,
-    hours: initial.weather.hours.map((hour) => ({ ...hour, rain: 0 })),
     twoDayHours: initial.weather.twoDayHours.map((hour) => ({ ...hour, rain: 0 })),
   };
-  assert.equal(hourlyChart(dry, layout.chart, initial.serverTime).match(/stroke="#175a78" stroke-width="5"/g)?.length, 2);
+  assert.equal(hourlyChart(dry, layout.chart, initial.serverTime).match(/stroke="#175a78" stroke-width="5"/g)?.length, 1);
 });
 
 test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
@@ -277,6 +267,7 @@ test("two-day weather chart contains 48 points, six-hour ticks, and a neutral el
   assert.equal((chart.match(/>6a<\/text>/g) || []).length, 2);
   assert.equal((chart.match(/>12p<\/text>/g) || []).length, 2);
   assert.equal((chart.match(/>6p<\/text>/g) || []).length, 2);
-  assert.match(chart, /calcMode="discrete"[^>]*keyTimes="0;0\.499;0\.5;0\.999;1" dur="60s"/);
+  assert.match(chart, /id="day-divider"[^>]*aria-label="Tomorrow starts"[^>]*x1="540\.0"[^>]*x2="540\.0"[^>]*stroke="#000" stroke-width="8"/);
+  assert.doesNotMatch(chart, /NEXT 24 HOURS|calcMode="discrete"|attributeName="visibility"|dur="60s"/);
   assert.doesNotMatch(chart, /<script/);
 });
