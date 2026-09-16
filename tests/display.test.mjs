@@ -89,8 +89,9 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
 });
 test("logged-out HTML contains no private content or automatic refresh", () => {
   const html = displayPage(false, false, true, "test", initial);
-  assert.doesNotMatch(html, /Dentist|temperature|http-equiv="refresh"/);
+  assert.doesNotMatch(html, /Dentist|temperature|http-equiv="refresh"|A little art/);
   assert.match(html, /Welcome home/);
+  assert.match(html, /Your day at a glance/);
 });
 test("weather failure still renders calendar and retries promptly without JS", () => {
   const html = displayPage(true, false, true, "test", {
