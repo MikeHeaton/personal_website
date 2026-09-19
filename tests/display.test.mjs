@@ -373,9 +373,13 @@ test("two-day weather chart positions and labels all four solar markers with a g
   assert.doesNotMatch(hourlyChart({ ...weather, sunTimes: [{ date: "2026-09-15", sunrise: null, sunset: "bad" }] }, layout.chart, initial.serverTime), /class="solar-marker"/);
 });
 
-test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask", () => {
+test("two-day weather chart contains 48 points, six-hour ticks, and a neutral elapsed mask without a visible legend", () => {
   const chart = hourlyChart(initial.weather, layout.chart, initial.serverTime);
-  assert.match(chart, /Today and tomorrow: 48 hourly/);
+  assert.match(chart, /Today and tomorrow: 48 hourly temperature and rainfall forecasts/);
+  assert.match(chart, /TEMPERATURE \(°F\)/);
+  assert.match(chart, /RAINFALL \(IN\)/);
+  assert.doesNotMatch(chart, />TEMPERATURE<\/text>|>RAINFALL<\/text>|>ELAPSED<\/text>/);
+  assert.doesNotMatch(chart, /x1="418" y1="1359"|x="694" y="1348"|x="906" y="1348"/);
   assert.match(chart, /fill="#6d716d" opacity="\.24"/);
   assert.match(chart, /stroke="#555b57" stroke-width="3" stroke-dasharray="9 7"/);
   for (const label of ["TUE 9/15", "WED 9/16", "THU 9/17"])
