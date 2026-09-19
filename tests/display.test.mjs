@@ -164,6 +164,7 @@ test("weather ingestion returns the local-midnight 48-hour window without rollin
     },
   };
   const result = await weather(Date.parse("2026-09-15T21:05:00Z"), async (url) => {
+    assert.match(String(url), /latitude=37\.7565942&longitude=-122\.4111482/);
     assert.match(String(url), /daily=[^&]*sunrise,sunset/);
     assert.match(String(url), /timezone=America%2FLos_Angeles/);
     return new Response(JSON.stringify(payload), { status: 200 });
