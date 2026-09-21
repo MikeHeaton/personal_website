@@ -3,6 +3,7 @@ import { authenticated, configured, secureHeaders } from '../../../lib/display-a
 import { displayPage } from '../../../lib/display-page.mjs';
 import { weather } from '../../../lib/display-data.mjs';
 import { calendar } from '../../../lib/display-calendar.mjs';
+import { createHabitStore, emptyHabitSnapshot, loadHabitSnapshot } from '../../../lib/display-habits.mjs';
 export default async function handler(req, res) {
   secureHeaders(res);
   if (req.method !== 'GET') return res.status(405).end();
@@ -13,11 +14,13 @@ export default async function handler(req, res) {
   let initial = null;
   if (signedIn) {
     const now = Date.now();
-    const [forecast, agenda] = await Promise.all([
+    const habitStore = createHabitStore();
+    const [forecast, agenda, habits] = await Promise.all([
       weather(now).catch(() => null),
       calendar(now).catch(() => null),
+      habitStore ? loadHabitSnapshot(habitStore, now).catch(() => emptyHabitSnapshot(now)) : emptyHabitSnapshot(now),
     ]);
-    initial = { calendar: agenda, weather: forecast, serverTime: now };
+    initial = { calendar: agenda, weather: forecast, habits, serverTime: now };
   }
   res.send(displayPage(signedIn, req.query.error === '1', configured(), nonce, initial));
 }

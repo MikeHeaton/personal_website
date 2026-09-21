@@ -7,7 +7,16 @@ import {
   validSession,
   cookie,
   MAX_AGE,
+  validBearer,
 } from "../lib/display-auth.mjs";
+import {
+  createHabitStore,
+  emptyHabitSnapshot,
+  habitDateWindow,
+  loadHabitSnapshot,
+  validateHabitRecord,
+} from "../lib/display-habits.mjs";
+import { createHandler as createHabitsHandler } from "../pages/api/display/habits.js";
 import {
   REFRESH_INTERVAL,
   hourSlot,
@@ -38,6 +47,97 @@ test("sessions expire, reject tampering, and are revoked by password rotation", 
     /HttpOnly; SameSite=Lax; Max-Age=15552000; Secure/,
   );
 });
+test("record API bearer authentication reuses the server-only display session secret", () => {
+  assert.equal(validBearer(`Bearer ${process.env.DISPLAY_SESSION_SECRET}`), true);
+  assert.equal(validBearer("Bearer incorrect"), false);
+  assert.equal(validBearer(undefined), false);
+});
+function apiResponse() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: undefined,
+    setHeader(name, value) { this.headers[name] = value; },
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+  };
+}
+
+test("habit record validation requires a real local date and all four boolean results", () => {
+  const valid = {
+    date: "2026-09-15",
+    habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false },
+  };
+  assert.deepEqual(validateHabitRecord(valid), valid);
+  assert.equal(validateHabitRecord({ ...valid, date: "2026-02-30" }), null);
+  assert.equal(validateHabitRecord({ ...valid, habits: { ...valid.habits, bed: "yes" } }), null);
+  assert.equal(validateHabitRecord({ ...valid, habits: { dogTeeth: true } }), null);
+  assert.equal(validateHabitRecord({ ...valid, habits: { ...valid.habits, surprise: true } }), null);
+});
+
+test("habit record API enforces auth, validation, and durable-store availability", async () => {
+  const writes = [];
+  const handler = createHabitsHandler(() => ({ write: async (record) => writes.push(record) }));
+  const base = { method: "POST", headers: { host: "example.test" }, cookies: {}, body: { date: "2026-09-15", habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false } } };
+  let res = apiResponse();
+  await handler(base, res);
+  assert.equal(res.statusCode, 401);
+  assert.equal(writes.length, 0);
+
+  res = apiResponse();
+  await handler({ ...base, headers: { ...base.headers, authorization: `Bearer ${process.env.DISPLAY_SESSION_SECRET}` }, body: { ...base.body, date: "not-a-date" } }, res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(writes.length, 0);
+
+  res = apiResponse();
+  await createHabitsHandler(() => null)({ ...base, headers: { ...base.headers, authorization: `Bearer ${process.env.DISPLAY_SESSION_SECRET}` } }, res);
+  assert.equal(res.statusCode, 503);
+  assert.deepEqual(res.body, { error: "habit_storage_unconfigured" });
+
+  const session = createSession();
+  res = apiResponse();
+  await handler({ ...base, headers: { ...base.headers, origin: "https://evil.example", "sec-fetch-site": "cross-site" }, cookies: { display_session: session } }, res);
+  assert.equal(res.statusCode, 403);
+  assert.equal(writes.length, 0);
+
+  res = apiResponse();
+  await handler({ ...base, headers: { ...base.headers, origin: "https://example.test" }, cookies: { display_session: session } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes.length, 1);
+
+  res = apiResponse();
+  await handler({ ...base, headers: { ...base.headers, authorization: `Bearer ${process.env.DISPLAY_SESSION_SECRET}` } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes.length, 2);
+  assert.equal(writes[1].date, "2026-09-15");
+});
+
+test("Upstash provider persists and reloads per-date records without exposing its token in the URL", async () => {
+  const values = new Map();
+  const calls = [];
+  const token = "private-storage-token";
+  const fetchImpl = async (url, options) => {
+    calls.push({ url: String(url), options });
+    const [operation, ...args] = JSON.parse(options.body);
+    if (operation === "SET") {
+      values.set(args[0], args[1]);
+      return new Response(JSON.stringify({ result: "OK" }), { status: 200 });
+    }
+    if (operation === "MGET") {
+      return new Response(JSON.stringify({ result: args.map((key) => values.get(key) ?? null) }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "unsupported" }), { status: 400 });
+  };
+  const store = createHabitStore({ KV_REST_API_URL: "https://example.upstash.io", KV_REST_API_TOKEN: token }, fetchImpl);
+  const record = { date: "2026-09-15", habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false } };
+  await store.write(record);
+  const snapshot = await loadHabitSnapshot(store, Date.parse("2026-09-15T20:00:00Z"));
+  assert.equal(snapshot.records["2026-09-15"].dogTeeth, true);
+  assert.equal(snapshot.records["2026-09-15"].bed, false);
+  assert.equal(snapshot.records["2026-09-14"].dogTeeth, false);
+  assert.ok(calls.every(({ url, options }) => !url.includes(token) && options.headers.Authorization === `Bearer ${token}` && options.cache === "no-store"));
+});
+
 test("rotation occurs at the hour and scheduling always targets the next boundary", () => {
   const boundary = Date.parse("2026-09-15T22:00:00Z");
   assert.equal(hourSlot(boundary) - hourSlot(boundary - 1), 1);
@@ -48,6 +148,13 @@ test("rotation occurs at the hour and scheduling always targets the next boundar
 import { displayPage, refreshSeconds } from "../lib/display-page.mjs";
 const initial = {
   serverTime: Date.parse("2026-09-15T21:59:30Z"),
+  habits: {
+    dates: ["2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14", "2026-09-15"],
+    records: {
+      "2026-09-14": { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false },
+      "2026-09-15": { dogTeeth: false, bed: true, strengthProtein: false, strengthRun: true },
+    },
+  },
   calendar: {
     days: [
       {
@@ -86,6 +193,13 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   assert.match(html, /content="30;url=\/display"/);
   assert.match(html, /viewBox="0 0 1080 1920"/);
   assert.match(html, /id="hourly-chart"/);
+  assert.match(html, /id="habits"/);
+  for (const label of ["🐕🪥", "🛏️", "💪🥤", "💪🏃"]) assert.match(html, new RegExp(label));
+  assert.match(html, />✓<\/text>/);
+  assert.match(html, /fill="#16833f"/);
+  assert.match(html, />X<\/text>/);
+  assert.match(html, /fill="#000000"/);
+  assert.doesNotMatch(html, /id="hourly-quote"|The best way out|Robert Frost/);
   assert.doesNotMatch(html, /id="next-24-hours-chart"|NEXT 24 HOURS/);
   assert.match(html, /TODAY \+ TOMORROW/);
   assert.match(html, /id="elapsed-mask"/);
@@ -213,9 +327,9 @@ import { columns, wrapLines } from "../lib/display/drawing.mjs";
 import {
   calendarDayPanel,
   hourlyChart,
+  habitsPanel,
   layout,
   interpolateTemperatureAtHour,
-  quoteForHour,
   solarEventOffsetHours,
   temperatureAxisBounds,
 } from "../lib/display/scene.mjs";
@@ -289,10 +403,13 @@ test("only overflowing calendar lists receive native SVG scrolling with dwell po
   assert.match(scrollingPanel, /SCROLLING/);
 });
 
-test("hourly quote is deterministic and the dry chart draws a visible blue zero line", () => {
-  const now = Date.parse("2026-09-15T19:00:00Z");
-  assert.deepEqual(quoteForHour(now), quoteForHour(now + 59 * 60 * 1000));
-  assert.notDeepEqual(quoteForHour(now), quoteForHour(now + 60 * 60 * 1000));
+test("habit grid uses the seven-date local window and the dry chart draws a visible blue zero line", () => {
+  const now = Date.parse("2026-09-15T07:00:00Z");
+  assert.deepEqual(habitDateWindow(now), ["2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14", "2026-09-15"]);
+  assert.deepEqual(habitDateWindow(Date.parse("2026-09-15T06:59:59Z")).slice(-1), ["2026-09-14"]);
+  const grid = habitsPanel(emptyHabitSnapshot(now), layout.habits, now);
+  assert.equal((grid.match(/class="habit-row"/g) || []).length, 4);
+  assert.equal((grid.match(/>X<\/text>/g) || []).length, 28);
   const dry = {
     ...initial.weather,
     twoDayHours: initial.weather.twoDayHours.map((hour) => ({ ...hour, rain: 0 })),

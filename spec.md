@@ -6,7 +6,7 @@
 
 The display contains:
 
-- A deterministic local quotation that changes on the hour without a network request.
+- A four-row habit grid covering the last seven `America/Los_Angeles` calendar dates, including today. Its row labels are exactly `🐕🪥`, `🛏️`, `💪🥤`, and `💪🏃`; a recorded `true` renders as a bold green check, while `false`, missing data, and unavailable storage render as a black X.
 - Side-by-side agenda lists for today and tomorrow in `America/Los_Angeles`. The server reads the private Google Calendar iCal feed from `GOOGLE_CALENDAR_ICAL_URL`, expands recurrence, includes all-day and multiday events that overlap either day, and handles iCalendar escaping. A list scrolls with native SVG animation only when its contents overflow; the animation dwells at the top and bottom, and browsers without animation support retain a useful static top-of-list view.
 - Mission District current temperature and conditions from Open-Meteo, using the address-level forecast point at `37.7565942, -122.4111482`.
 - A five-day forecast with daily conditions, high and low temperatures, and maximum precipitation probability.
@@ -19,12 +19,33 @@ The authenticated HTML page refreshes every ten minutes, aligned to ten-minute b
 
 - `next.config.js` rewrites `/display` to the authenticated server-rendered route at `pages/api/display/screen.js`.
 - `lib/display-page.mjs` renders the login or display document and schedules refreshes.
-- `lib/display/scene.mjs` defines the 1080 × 1920 layout and renders the quote, agendas, current conditions, five-day forecast, midnight-based 48-hour chart, and footer.
+- `lib/display/scene.mjs` defines the 1080 × 1920 layout and renders the seven-date habit grid, agendas, current conditions, five-day forecast, midnight-based 48-hour chart, and footer.
 - `lib/display/drawing.mjs` provides SVG 1.1 drawing primitives compatible with the EO1.
 - `lib/display-calendar.mjs` performs bounded server-only iCal fetching and parsing, recurrence expansion, day-overlap selection, and ten-minute caching.
 - `lib/display-data.mjs` fetches and validates bounded Open-Meteo data for the Mission District address-level forecast point, selects the local-midnight 48-hour forecast window and its two dates' sunrise/sunset values, and controls weather caching and refresh clocks.
-- `lib/display-auth.mjs` and `pages/api/display/login.js` implement display authentication. Credentials and the private calendar URL belong only in local and deployment environment configuration and must never be committed or exposed to the browser.
-- `tests/display.test.mjs` covers authentication, timing, server rendering, degraded weather behavior, calendar recurrence and boundaries, escaping, conditional scrolling, the 48-hour weather window, solar-data parsing and fallback, fractional solar-marker positioning and temperature interpolation, two-day solar labels, temperature-axis bounds, six-hour ticks, the +24-hour divider, elapsed shading, zero-rain rendering, and layout bounds.
+- `lib/display-habits.mjs` defines the habit/date model and an explicit durable-store provider backed by the Upstash Redis REST API. Each local date is a separate Redis key; the dashboard reads the seven needed keys with `MGET`, and unavailable or malformed values safely fall back to false.
+- `lib/display-auth.mjs`, `pages/api/display/login.js`, and `pages/api/display/habits.js` implement display and record-API authentication. Credentials, storage credentials, and the private calendar URL belong only in local and deployment environment configuration and must never be committed, logged, or exposed to the browser.
+
+## Habit record API and persistence
+
+`POST /api/display/habits` accepts JSON in this exact form:
+
+```json
+{
+  "date": "2026-09-21",
+  "habits": {
+    "dogTeeth": true,
+    "bed": false,
+    "strengthProtein": true,
+    "strengthRun": false
+  }
+}
+```
+
+The date must be a real `YYYY-MM-DD` local calendar date, all four keys are required, no extra keys are accepted, and every result must be boolean. Authentication may use the existing valid `display_session` HttpOnly cookie from a same-origin request or `Authorization: Bearer <DISPLAY_SESSION_SECRET>` for a server-to-server recorder. Success returns HTTP 200 with the normalized record. Invalid input returns 400, missing/invalid authentication returns 401 (or 403 for a cross-site cookie request), and unconfigured or unavailable durable storage returns 503.
+
+Production persistence requires a free Upstash Redis database connected through Vercel Marketplace with server-only `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Direct Upstash setups may instead use the compatible aliases `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The dashboard remains renderable if storage is absent, but the record endpoint deliberately fails with `habit_storage_unconfigured`; process memory and the serverless filesystem are never used.
+- `tests/display.test.mjs` covers display and record-API authentication, habit validation/persistence/date windows/symbols/labels/quote removal, timing, server rendering, degraded weather behavior, calendar recurrence and boundaries, escaping, conditional scrolling, the 48-hour weather window, solar-data parsing and fallback, fractional solar-marker positioning and temperature interpolation, two-day solar labels, temperature-axis bounds, six-hour ticks, the +24-hour divider, elapsed shading, zero-rain rendering, and layout bounds.
 
 # How To Update
 
@@ -34,5 +55,5 @@ The authenticated HTML page refreshes every ten minutes, aligned to ten-minute b
 4. Keep calendar ingestion server-only. Bound response size, component count, recurrence expansion, and fetch duration; treat malformed, missing, or unavailable feeds as a graceful panel failure. Never log, render, commit, or otherwise disclose `GOOGLE_CALENDAR_ICAL_URL`.
 5. Preserve the existing weather source and units unless intentionally changing the product: Open-Meteo, Fahrenheit, inches of rainfall, and `America/Los_Angeles` display times.
 6. Avoid unnecessary pushes. Make focused changes only when the implementation needs to change, and keep unrelated files out of the commit.
-7. Before pushing, run `npm test` and `npm run build`. Visually check `/display` at 1080 × 1920 and a narrow viewport with empty, normal, and overflowing agendas plus wet and dry forecast fixtures. Inspect scroll dwell/fallback, the sole 48-hour chart, elapsed mask, six-hour ticks, dated midnight labels, the thick black +24-hour divider, all available sunrise/sunset markers and labels, the dry-rain line, axes, and footer; confirm nothing clips or overlaps. Verify `/` remains unchanged. When available, verify the actual EO1 after refresh; a modern-browser screenshot alone does not prove old-device compatibility.
+7. Before pushing, run `npm test` and `npm run build`. Visually check `/display` at 1080 × 1920 and a narrow viewport with empty, normal, and overflowing agendas plus wet and dry forecast fixtures. Inspect the seven-date habit grid and exact labels/symbol colors, scroll dwell/fallback, the sole 48-hour chart, elapsed mask, six-hour ticks, dated midnight labels, the thick black +24-hour divider, all available sunrise/sunset markers and labels, the dry-rain line, axes, and footer; confirm nothing clips or overlaps. Verify `/` remains unchanged. When available, verify the actual EO1 after refresh; a modern-browser screenshot alone does not prove old-device compatibility.
 8. Update this specification whenever intended display behavior, data sources, timing, authentication, layout, or verification changes.
