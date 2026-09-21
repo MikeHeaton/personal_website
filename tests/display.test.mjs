@@ -129,12 +129,12 @@ test("Upstash provider persists and reloads per-date records without exposing it
     return new Response(JSON.stringify({ error: "unsupported" }), { status: 400 });
   };
   const store = createHabitStore({ KV_REST_API_URL: "https://example.upstash.io", KV_REST_API_TOKEN: token }, fetchImpl);
-  const record = { date: "2026-09-15", habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false } };
+  const record = { date: "2026-09-14", habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false } };
   await store.write(record);
   const snapshot = await loadHabitSnapshot(store, Date.parse("2026-09-15T20:00:00Z"));
-  assert.equal(snapshot.records["2026-09-15"].dogTeeth, true);
-  assert.equal(snapshot.records["2026-09-15"].bed, false);
-  assert.equal(snapshot.records["2026-09-14"].dogTeeth, false);
+  assert.equal(snapshot.records["2026-09-14"].dogTeeth, true);
+  assert.equal(snapshot.records["2026-09-14"].bed, false);
+  assert.equal(snapshot.records["2026-09-13"], null);
   assert.ok(calls.every(({ url, options }) => !url.includes(token) && options.headers.Authorization === `Bearer ${token}` && options.cache === "no-store"));
 });
 
@@ -149,10 +149,10 @@ import { displayPage, refreshSeconds } from "../lib/display-page.mjs";
 const initial = {
   serverTime: Date.parse("2026-09-15T21:59:30Z"),
   habits: {
-    dates: ["2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14", "2026-09-15"],
+    dates: ["2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14"],
     records: {
+      "2026-09-13": null,
       "2026-09-14": { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false },
-      "2026-09-15": { dogTeeth: false, bed: true, strengthProtein: false, strengthRun: true },
     },
   },
   calendar: {
@@ -194,11 +194,19 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   assert.match(html, /viewBox="0 0 1080 1920"/);
   assert.match(html, /id="hourly-chart"/);
   assert.match(html, /id="habits"/);
-  for (const label of ["🐕🪥", "🛏️", "💪🥤", "💪🏃"]) assert.match(html, new RegExp(label));
+  for (const label of ["Brush dog teeth", "Make bed", "Strength and protein", "Strength and run"])
+    assert.match(html, new RegExp(`aria-label="${label}"`));
+  assert.equal((html.match(/class="habit-label-art"/g) || []).length, 4);
+  assert.doesNotMatch(html, /🐕|🪥|🛏|💪|🥤|🏃/u);
   assert.match(html, />✓<\/text>/);
   assert.match(html, /fill="#16833f"/);
   assert.match(html, />X<\/text>/);
   assert.match(html, /fill="#000000"/);
+  assert.equal((html.match(/>X<\/text>/g) || []).length, 2);
+  assert.equal((html.match(/>✓<\/text>/g) || []).length, 2);
+  assert.match(html, />TU 9\/8<\/text>/);
+  assert.match(html, />MO 9\/14<\/text>/);
+  assert.doesNotMatch(html, />TU 9\/15<\/text>/);
   assert.doesNotMatch(html, /id="hourly-quote"|The best way out|Robert Frost/);
   assert.doesNotMatch(html, /id="next-24-hours-chart"|NEXT 24 HOURS/);
   assert.match(html, /TODAY \+ TOMORROW/);
@@ -328,6 +336,8 @@ import {
   calendarDayPanel,
   hourlyChart,
   habitsPanel,
+  HABIT_ICON_WIDTH,
+  HABIT_LABEL_WIDTH,
   layout,
   interpolateTemperatureAtHour,
   solarEventOffsetHours,
@@ -403,18 +413,57 @@ test("only overflowing calendar lists receive native SVG scrolling with dwell po
   assert.match(scrollingPanel, /SCROLLING/);
 });
 
-test("habit grid uses the seven-date local window and the dry chart draws a visible blue zero line", () => {
+test("habit grid uses seven completed local dates ending yesterday and the dry chart draws a visible blue zero line", () => {
   const now = Date.parse("2026-09-15T07:00:00Z");
-  assert.deepEqual(habitDateWindow(now), ["2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14", "2026-09-15"]);
-  assert.deepEqual(habitDateWindow(Date.parse("2026-09-15T06:59:59Z")).slice(-1), ["2026-09-14"]);
+  assert.deepEqual(habitDateWindow(now), ["2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14"]);
+  assert.deepEqual(habitDateWindow(Date.parse("2026-09-15T06:59:59Z")), ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"]);
   const grid = habitsPanel(emptyHabitSnapshot(now), layout.habits, now);
   assert.equal((grid.match(/class="habit-row"/g) || []).length, 4);
-  assert.equal((grid.match(/>X<\/text>/g) || []).length, 28);
+  assert.equal((grid.match(/>X<\/text>|>✓<\/text>/g) || []).length, 0);
   const dry = {
     ...initial.weather,
     twoDayHours: initial.weather.twoDayHours.map((hour) => ({ ...hour, rain: 0 })),
   };
   assert.equal(hourlyChart(dry, layout.chart, initial.serverTime).match(/stroke="#175a78" stroke-width="5"/g)?.length, 1);
+});
+
+test("habit grid distinguishes missing records from stored false values", () => {
+  const now = Date.parse("2026-09-15T20:00:00Z");
+  const snapshot = emptyHabitSnapshot(now);
+  snapshot.records["2026-09-14"] = {
+    dogTeeth: true,
+    bed: false,
+    strengthProtein: true,
+    strengthRun: false,
+  };
+  const grid = habitsPanel(snapshot, layout.habits, now);
+  assert.equal((grid.match(/>✓<\/text>/g) || []).length, 2);
+  assert.equal((grid.match(/>X<\/text>/g) || []).length, 2);
+  assert.equal((grid.match(/>✓<\/text>|>X<\/text>/g) || []).length, 4);
+});
+
+test("habit labels use centered accessible SVG drawings inside a narrow label column", () => {
+  const grid = habitsPanel(emptyHabitSnapshot(Date.parse("2026-09-15T20:00:00Z")), layout.habits);
+  assert.equal(HABIT_LABEL_WIDTH, 112);
+  assert.ok(HABIT_LABEL_WIDTH < 142);
+  assert.ok(HABIT_ICON_WIDTH < HABIT_LABEL_WIDTH);
+  assert.equal((grid.match(/class="habit-label-art"/g) || []).length, 4);
+  assert.doesNotMatch(grid, /<image|xlink:href|@font-face|🐕|🪥|🛏|💪|🥤|🏃/u);
+  for (const label of ["Brush dog teeth", "Make bed", "Strength and protein", "Strength and run"])
+    assert.match(grid, new RegExp(`role="img" aria-label="${label}"><title>${label}<\\/title>`));
+  const centers = [...grid.matchAll(/class="habit-label-art"[^>]*data-icon-left="([\d.]+)" data-icon-right="([\d.]+)" transform="translate\(([\d.]+) ([\d.]+)\)"/g)]
+    .map((match) => match.slice(1).map(Number));
+  assert.equal(centers.length, 4);
+  const expectedX = layout.habits.x + HABIT_LABEL_WIDTH / 2;
+  const rowHeight = (layout.habits.height - 38) / 4;
+  centers.forEach(([left, right, x, y], index) => {
+    assert.equal(x, expectedX);
+    assert.equal((left + right) / 2, expectedX);
+    assert.ok(left >= layout.habits.x);
+    assert.ok(right <= layout.habits.x + HABIT_LABEL_WIDTH);
+    assert.equal(y, layout.habits.y + 38 + (index + 0.5) * rowHeight);
+  });
+  assert.match(grid, new RegExp(`x1="${layout.habits.x + HABIT_LABEL_WIDTH}"`));
 });
 
 test("rainfall axis uses a 0.05-inch baseline and expands with rounded headroom", () => {
