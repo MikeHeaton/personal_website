@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   passwordHash,
   verifyPassword,
@@ -182,7 +183,7 @@ const initial = {
     days: [{ date: "2026-09-15", code: 0, high: 70, low: 54, rain: 2 }],
   },
 };
-test("initial HTML contains calendar and forecast without artwork or JavaScript", () => {
+test("initial HTML contains calendar, forecast, and inline habit artwork without JavaScript", () => {
   const html = displayPage(true, false, true, "test", initial);
   assert.match(html, /id="calendar"/);
   assert.match(html, /Dentist &lt;check&gt;/);
@@ -197,7 +198,11 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   for (const label of ["Keke teeth brushing", "In bed early", "Took creatine", "Did exercise"])
     assert.match(html, new RegExp(`aria-label="${label}"`));
   assert.equal((html.match(/class="habit-label-art"/g) || []).length, 4);
+  assert.equal((html.match(/class="twemoji /g) || []).length, 7);
+  for (const color of ["#D99E82", "#3DB8C1", "#55ACEE", "#FFDC5D", "#DD2E44"])
+    assert.match(html, new RegExp(`fill="${color}"`));
   assert.doesNotMatch(html, /🐕|🪥|🛏|💪|🥤|🏃/u);
+  assert.doesNotMatch(html, /<image\b|\b(?:href|xlink:href)=|data:image|@font-face/i);
   assert.match(html, />✓<\/text>/);
   assert.match(html, /fill="#16833f"/);
   assert.match(html, />X<\/text>/);
@@ -442,28 +447,48 @@ test("habit grid distinguishes missing records from stored false values", () => 
   assert.equal((grid.match(/>✓<\/text>|>X<\/text>/g) || []).length, 4);
 });
 
-test("habit labels use centered accessible SVG drawings inside a narrow label column", () => {
+test("habit labels use centered accessible full-color inline emoji artwork inside a narrow label column", () => {
   const grid = habitsPanel(emptyHabitSnapshot(Date.parse("2026-09-15T20:00:00Z")), layout.habits);
   assert.equal(HABIT_LABEL_WIDTH, 112);
   assert.ok(HABIT_LABEL_WIDTH < 142);
   assert.ok(HABIT_ICON_WIDTH < HABIT_LABEL_WIDTH);
   assert.equal((grid.match(/class="habit-label-art"/g) || []).length, 4);
-  assert.doesNotMatch(grid, /<image|xlink:href|@font-face|🐕|🪥|🛏|💪|🥤|🏃/u);
+  assert.equal((grid.match(/class="twemoji /g) || []).length, 7);
+  for (const [name, count] of [["dog", 1], ["toothbrush", 1], ["bed", 1], ["biceps", 2], ["cup", 1], ["runner", 1]])
+    assert.equal((grid.match(new RegExp(`twemoji-${name}\\b`, "g")) || []).length, count);
+  for (const color of ["#D99E82", "#3DB8C1", "#55ACEE", "#FFDC5D", "#DD2E44"])
+    assert.match(grid, new RegExp(`fill="${color}"`));
+  assert.doesNotMatch(grid, /<image\b|\b(?:href|xlink:href)=|data:image|@font-face|https?:\/\/|url\(|<script\b|<filter\b|<mask\b|🐕|🪥|🛏|💪|🥤|🏃/iu);
   for (const label of ["Keke teeth brushing", "In bed early", "Took creatine", "Did exercise"])
     assert.match(grid, new RegExp(`role="img" aria-label="${label}"><title>${label}<\\/title>`));
-  const centers = [...grid.matchAll(/class="habit-label-art"[^>]*data-icon-left="([\d.]+)" data-icon-right="([\d.]+)" transform="translate\(([\d.]+) ([\d.]+)\)"/g)]
+  const centers = [...grid.matchAll(/class="habit-label-art"[^>]*data-icon-left="([\d.]+)" data-icon-right="([\d.]+)" data-icon-top="([\d.]+)" data-icon-bottom="([\d.]+)" transform="translate\(([\d.]+) ([\d.]+)\)"/g)]
     .map((match) => match.slice(1).map(Number));
   assert.equal(centers.length, 4);
   const expectedX = layout.habits.x + HABIT_LABEL_WIDTH / 2;
   const rowHeight = (layout.habits.height - 38) / 4;
-  centers.forEach(([left, right, x, y], index) => {
+  centers.forEach(([left, right, top, bottom, x, y], index) => {
+    const rowTop = layout.habits.y + 38 + index * rowHeight;
+    const rowBottom = rowTop + rowHeight;
     assert.equal(x, expectedX);
     assert.equal((left + right) / 2, expectedX);
     assert.ok(left >= layout.habits.x);
     assert.ok(right <= layout.habits.x + HABIT_LABEL_WIDTH);
-    assert.equal(y, layout.habits.y + 38 + (index + 0.5) * rowHeight);
+    assert.equal(y, rowTop + rowHeight / 2);
+    assert.equal((top + bottom) / 2, y);
+    assert.ok(top >= rowTop);
+    assert.ok(bottom <= rowBottom);
   });
   assert.match(grid, new RegExp(`x1="${layout.habits.x + HABIT_LABEL_WIDTH}"`));
+});
+
+test("Twemoji artwork attribution pins the six bundled assets and graphics license", () => {
+  const notice = readFileSync(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8");
+  assert.match(notice, /jdecked\/twemoji/);
+  assert.match(notice, /v17\.0\.3/);
+  assert.match(notice, /b6b55fef1e8636b540a6d016a4729ca8cdf2e60b/);
+  for (const codepoint of ["1f415", "1faa5", "1f6cf", "1f4aa", "1f964", "1f3c3"])
+    assert.match(notice, new RegExp(`${codepoint}\\.svg`));
+  assert.match(notice, /Creative Commons Attribution 4\.0 International license \(CC BY 4\.0\)/);
 });
 
 test("rainfall axis uses a 0.05-inch baseline and expands with rounded headroom", () => {
