@@ -194,7 +194,7 @@ test("initial HTML contains calendar and forecast without artwork or JavaScript"
   assert.match(html, /viewBox="0 0 1080 1920"/);
   assert.match(html, /id="hourly-chart"/);
   assert.match(html, /id="habits"/);
-  for (const label of ["Brush dog teeth", "Make bed", "Strength and protein", "Strength and run"])
+  for (const label of ["Keke teeth brushing", "In bed early", "Took creatine", "Did exercise"])
     assert.match(html, new RegExp(`aria-label="${label}"`));
   assert.equal((html.match(/class="habit-label-art"/g) || []).length, 4);
   assert.doesNotMatch(html, /🐕|🪥|🛏|💪|🥤|🏃/u);
@@ -449,7 +449,7 @@ test("habit labels use centered accessible SVG drawings inside a narrow label co
   assert.ok(HABIT_ICON_WIDTH < HABIT_LABEL_WIDTH);
   assert.equal((grid.match(/class="habit-label-art"/g) || []).length, 4);
   assert.doesNotMatch(grid, /<image|xlink:href|@font-face|🐕|🪥|🛏|💪|🥤|🏃/u);
-  for (const label of ["Brush dog teeth", "Make bed", "Strength and protein", "Strength and run"])
+  for (const label of ["Keke teeth brushing", "In bed early", "Took creatine", "Did exercise"])
     assert.match(grid, new RegExp(`role="img" aria-label="${label}"><title>${label}<\\/title>`));
   const centers = [...grid.matchAll(/class="habit-label-art"[^>]*data-icon-left="([\d.]+)" data-icon-right="([\d.]+)" transform="translate\(([\d.]+) ([\d.]+)\)"/g)]
     .map((match) => match.slice(1).map(Number));
