@@ -17,6 +17,7 @@ import {
   loadHabitSnapshot,
   validateHabitRecord,
 } from "../lib/display-habits.mjs";
+import { HISTORICAL_HABIT_RECORDS } from "../lib/display-habit-seeds.mjs";
 import { createHandler as createHabitsHandler } from "../pages/api/display/habits.js";
 import {
   REFRESH_INTERVAL,
@@ -151,6 +152,36 @@ test("Upstash provider persists and reloads per-date records without exposing it
   assert.deepEqual(snapshot.records["2026-09-13"], { status: "sick" });
   assert.equal(snapshot.records["2026-09-12"], null);
   assert.ok(calls.every(({ url, options }) => !url.includes(token) && options.headers.Authorization === `Bearer ${token}` && options.cache === "no-store"));
+});
+
+test("git-backed sick days seed exact dates and valid durable records take precedence", async () => {
+  assert.deepEqual(Object.keys(HISTORICAL_HABIT_RECORDS), ["2026-10-23", "2026-10-24", "2026-10-25"]);
+  const now = Date.parse("2026-10-26T20:00:00Z");
+  const empty = emptyHabitSnapshot(now);
+  assert.equal(empty.records["2026-10-22"], null);
+  for (const date of Object.keys(HISTORICAL_HABIT_RECORDS))
+    assert.deepEqual(empty.records[date], { status: "sick" });
+
+  const override = { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false };
+  const stored = await loadHabitSnapshot({
+    async readDates() {
+      return {
+        "2026-10-23": JSON.stringify(override),
+        "2026-10-24": null,
+        "2026-10-25": "malformed",
+      };
+    },
+  }, now);
+  assert.deepEqual(stored.records["2026-10-23"], override);
+  assert.deepEqual(stored.records["2026-10-24"], { status: "sick" });
+  assert.deepEqual(stored.records["2026-10-25"], { status: "sick" });
+  assert.equal(stored.records["2026-10-22"], null);
+
+  const unavailable = await loadHabitSnapshot({
+    async readDates() { throw new Error("unavailable"); },
+  }, now);
+  for (const date of Object.keys(HISTORICAL_HABIT_RECORDS))
+    assert.deepEqual(unavailable.records[date], { status: "sick" });
 });
 
 test("rotation occurs at the hour and scheduling always targets the next boundary", () => {
@@ -461,12 +492,9 @@ test("habit grid distinguishes missing records from stored false values", () => 
   assert.equal((grid.match(/>✓<\/text>|>X<\/text>/g) || []).length, 4);
 });
 
-test("sick dates render accessible inline sick faces in all four cells instead of habit results", () => {
+test("seeded sick dates render accessible inline sick faces in all twelve cells instead of habit results", () => {
   const now = Date.parse("2026-10-26T20:00:00Z");
-  const snapshot = emptyHabitSnapshot(now);
-  for (const date of ["2026-10-23", "2026-10-24", "2026-10-25"])
-    snapshot.records[date] = { status: "sick" };
-  const grid = habitsPanel(snapshot, layout.habits, now);
+  const grid = habitsPanel(emptyHabitSnapshot(now), layout.habits, now);
   assert.equal((grid.match(/class="habit-sick-art"/g) || []).length, 12);
   for (const date of ["2026-10-23", "2026-10-24", "2026-10-25"]) {
     assert.equal((grid.match(new RegExp(`data-date="${date}"`, "g")) || []).length, 4);
