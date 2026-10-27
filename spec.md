@@ -6,7 +6,7 @@
 
 The display contains:
 
-- A four-row habit grid covering the seven completed `America/Los_Angeles` calendar dates ending yesterday; today is never included. The 112-design-unit left label column closely fits the user's familiar full-color artwork pairs—dog + toothbrush, bed, flexed biceps + cup with straw, and flexed biceps + person running—whose exact accessible labels are `Keke teeth brushing`, `In bed early`, `Took creatine`, and `Did exercise`, leaving the remaining width to seven equal date columns. Each label is centered horizontally and vertically in its row. The six Twemoji graphics are bundled as minimal inline SVG 1.1-safe shape constants and emitted directly into the server-rendered dashboard SVG, with no native emoji glyphs, webfonts, raster assets, JavaScript, runtime network fetches, external references, data URIs, filters, or masks. Every row retains its full accessible text label. A stored `true` renders as a bold green check, a stored `false` renders as a black X, and a date with no valid stored record (including unavailable storage) leaves all four cells blank.
+- A four-row habit grid covering the seven completed `America/Los_Angeles` calendar dates ending yesterday; today is never included. The 112-design-unit left label column closely fits the user's familiar full-color artwork pairs—dog + toothbrush, bed, flexed biceps + cup with straw, and flexed biceps + person running—whose exact accessible labels are `Keke teeth brushing`, `In bed early`, `Took creatine`, and `Did exercise`, leaving the remaining width to seven equal date columns. Each label is centered horizontally and vertically in its row. The six Twemoji graphics are bundled as minimal inline SVG 1.1-safe shape constants and emitted directly into the server-rendered dashboard SVG, with no native emoji glyphs, webfonts, raster assets, JavaScript, runtime network fetches, external references, data URIs, filters, or masks. Every row retains its full accessible text label. A stored `true` renders as a bold green check, a stored `false` renders as a black X, and a whole-day `{ "status": "sick" }` record renders an accessible inline sick-face illustration in place of every check or X for that date. Sick days are skipped rather than completed or failed. A date with no valid stored record (including unavailable storage) leaves all four cells blank.
 - Side-by-side agenda lists for today and tomorrow in `America/Los_Angeles`. The server reads the private Google Calendar iCal feed from `GOOGLE_CALENDAR_ICAL_URL`, expands recurrence, includes all-day and multiday events that overlap either day, and handles iCalendar escaping. A list scrolls with native SVG animation only when its contents overflow; the animation dwells at the top and bottom, and browsers without animation support retain a useful static top-of-list view.
 - Mission District current temperature and conditions from Open-Meteo, using the address-level forecast point at `37.7565942, -122.4111482`.
 - A five-day forecast with daily conditions, high and low temperatures, and maximum precipitation probability.
@@ -29,7 +29,7 @@ The authenticated HTML page refreshes every ten minutes, aligned to ten-minute b
 
 ## Habit record API and persistence
 
-`POST /api/display/habits` accepts JSON in this exact form:
+`POST /api/display/habits` accepts either an ordinary habit record:
 
 ```json
 {
@@ -43,7 +43,16 @@ The authenticated HTML page refreshes every ten minutes, aligned to ten-minute b
 }
 ```
 
-The date must be a real `YYYY-MM-DD` local calendar date, all four keys are required, no extra keys are accepted, and every result must be boolean. Authentication may use the existing valid `display_session` HttpOnly cookie from a same-origin request or `Authorization: Bearer <DISPLAY_SESSION_SECRET>` for a server-to-server recorder. Success returns HTTP 200 with the normalized record. Invalid input returns 400, missing/invalid authentication returns 401 (or 403 for a cross-site cookie request), and unconfigured or unavailable durable storage returns 503.
+or a whole sick day:
+
+```json
+{
+  "date": "2026-10-23",
+  "status": "sick"
+}
+```
+
+The date must be a real `YYYY-MM-DD` local calendar date. Ordinary records require all four habit keys and boolean results. Sick-day records require the exact `sick` status. The two forms cannot be combined, and no extra keys are accepted. Existing boolean records remain valid and readable. Authentication may use the existing valid `display_session` HttpOnly cookie from a same-origin request or `Authorization: Bearer <DISPLAY_SESSION_SECRET>` for a server-to-server recorder. Success returns HTTP 200 with the normalized record. Invalid input returns 400, missing/invalid authentication returns 401 (or 403 for a cross-site cookie request), and unconfigured or unavailable durable storage returns 503.
 
 Production persistence requires a free Upstash Redis database connected through Vercel Marketplace with server-only `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Direct Upstash setups may instead use the compatible aliases `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The dashboard remains renderable if storage is absent, but the record endpoint deliberately fails with `habit_storage_unconfigured`; process memory and the serverless filesystem are never used.
 - `tests/display.test.mjs` covers display and record-API authentication, habit validation/persistence, missing-versus-false rendering, the yesterday-ended local date window, font-independent full-color inline habit artwork, representative source colors, exact icon pairings, accessible labels and bounds, narrow label-column geometry, absence of native emoji and external image/font/network dependencies, pinned license attribution, timing, server rendering, degraded weather behavior, calendar recurrence and boundaries, escaping, conditional scrolling, the 48-hour weather window, solar-data parsing and fallback, fractional solar-marker positioning and temperature interpolation, two-day solar labels, temperature-axis bounds, six-hour ticks, the +24-hour divider, elapsed shading, zero-rain rendering, and layout bounds.

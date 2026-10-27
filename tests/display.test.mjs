@@ -64,16 +64,21 @@ function apiResponse() {
   };
 }
 
-test("habit record validation requires a real local date and all four boolean results", () => {
+test("habit record validation accepts boolean results or an exact sick-day status", () => {
   const valid = {
     date: "2026-09-15",
     habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false },
   };
+  const sick = { date: "2026-09-15", status: "sick" };
   assert.deepEqual(validateHabitRecord(valid), valid);
+  assert.deepEqual(validateHabitRecord(sick), sick);
   assert.equal(validateHabitRecord({ ...valid, date: "2026-02-30" }), null);
   assert.equal(validateHabitRecord({ ...valid, habits: { ...valid.habits, bed: "yes" } }), null);
   assert.equal(validateHabitRecord({ ...valid, habits: { dogTeeth: true } }), null);
   assert.equal(validateHabitRecord({ ...valid, habits: { ...valid.habits, surprise: true } }), null);
+  assert.equal(validateHabitRecord({ ...valid, status: "sick" }), null);
+  assert.equal(validateHabitRecord({ ...sick, status: "skipped" }), null);
+  assert.equal(validateHabitRecord({ ...sick, note: "rest" }), null);
 });
 
 test("habit record API enforces auth, validation, and durable-store availability", async () => {
@@ -111,6 +116,12 @@ test("habit record API enforces auth, validation, and durable-store availability
   assert.equal(res.statusCode, 200);
   assert.equal(writes.length, 2);
   assert.equal(writes[1].date, "2026-09-15");
+
+  res = apiResponse();
+  await handler({ ...base, headers: { ...base.headers, authorization: `Bearer ${process.env.DISPLAY_SESSION_SECRET}` }, body: { date: "2026-09-16", status: "sick" } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { ok: true, date: "2026-09-16", status: "sick" });
+  assert.deepEqual(writes[2], { date: "2026-09-16", status: "sick" });
 });
 
 test("Upstash provider persists and reloads per-date records without exposing its token in the URL", async () => {
@@ -132,10 +143,13 @@ test("Upstash provider persists and reloads per-date records without exposing it
   const store = createHabitStore({ KV_REST_API_URL: "https://example.upstash.io", KV_REST_API_TOKEN: token }, fetchImpl);
   const record = { date: "2026-09-14", habits: { dogTeeth: true, bed: false, strengthProtein: true, strengthRun: false } };
   await store.write(record);
+  await store.write({ date: "2026-09-13", status: "sick" });
+  values.set("display:habits:2026-09-12", JSON.stringify({ status: "vacation" }));
   const snapshot = await loadHabitSnapshot(store, Date.parse("2026-09-15T20:00:00Z"));
   assert.equal(snapshot.records["2026-09-14"].dogTeeth, true);
   assert.equal(snapshot.records["2026-09-14"].bed, false);
-  assert.equal(snapshot.records["2026-09-13"], null);
+  assert.deepEqual(snapshot.records["2026-09-13"], { status: "sick" });
+  assert.equal(snapshot.records["2026-09-12"], null);
   assert.ok(calls.every(({ url, options }) => !url.includes(token) && options.headers.Authorization === `Bearer ${token}` && options.cache === "no-store"));
 });
 
@@ -445,6 +459,21 @@ test("habit grid distinguishes missing records from stored false values", () => 
   assert.equal((grid.match(/>✓<\/text>/g) || []).length, 2);
   assert.equal((grid.match(/>X<\/text>/g) || []).length, 2);
   assert.equal((grid.match(/>✓<\/text>|>X<\/text>/g) || []).length, 4);
+});
+
+test("sick dates render accessible inline sick faces in all four cells instead of habit results", () => {
+  const now = Date.parse("2026-10-26T20:00:00Z");
+  const snapshot = emptyHabitSnapshot(now);
+  for (const date of ["2026-10-23", "2026-10-24", "2026-10-25"])
+    snapshot.records[date] = { status: "sick" };
+  const grid = habitsPanel(snapshot, layout.habits, now);
+  assert.equal((grid.match(/class="habit-sick-art"/g) || []).length, 12);
+  for (const date of ["2026-10-23", "2026-10-24", "2026-10-25"]) {
+    assert.equal((grid.match(new RegExp(`data-date="${date}"`, "g")) || []).length, 4);
+    assert.equal((grid.match(new RegExp(`aria-label="Sick day for ${date}"`, "g")) || []).length, 4);
+  }
+  assert.equal((grid.match(/>✓<\/text>|>X<\/text>/g) || []).length, 0);
+  assert.doesNotMatch(grid, /🤒|<image\b|\b(?:href|xlink:href)=|data:image|@font-face|https?:\/\/|url\(|<script\b|<filter\b|<mask\b/iu);
 });
 
 test("habit labels use centered accessible full-color inline emoji artwork inside a narrow label column", () => {

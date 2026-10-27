@@ -20,7 +20,7 @@ export function createHandler(storeFactory = () => createHabitStore()) {
     if (!store) return res.status(503).json({ error: 'habit_storage_unconfigured' });
     try {
       await store.write(record);
-      return res.status(200).json({ ok: true, date: record.date, habits: record.habits });
+      return res.status(200).json({ ok: true, ...record });
     } catch {
       return res.status(503).json({ error: 'habit_storage_unavailable' });
     }
