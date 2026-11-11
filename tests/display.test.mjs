@@ -229,7 +229,7 @@ const initial = {
   },
 };
 test("initial HTML contains calendar, forecast, and inline habit artwork without JavaScript", () => {
-  const html = displayPage(true, false, true, "test", initial);
+  const html = displayPage(true, false, true, "test", { ...initial, serverTime: initial.serverTime - 60000 });
   assert.match(html, /id="calendar"/);
   assert.match(html, /Dentist &lt;check&gt;/);
   assert.match(html, /Nothing scheduled/);
@@ -294,21 +294,21 @@ test("weather failure still renders calendar and retries promptly without JS", (
   assert.equal(refreshSeconds(Date.parse("2026-09-15T21:59:59.900Z"), true), 1);
 });
 
-test("authenticated HTML refreshes every ten minutes without JavaScript", () => {
+test("authenticated HTML refreshes every minute without JavaScript", () => {
   const html = displayPage(true, false, true, "test", {
     ...initial,
     serverTime: Date.parse("2026-09-15T21:30:00Z"),
   });
-  assert.match(html, /http-equiv="refresh" content="600;url=\/display"/);
+  assert.match(html, /http-equiv="refresh" content="60;url=\/display"/);
   assert.doesNotMatch(html, /<script/);
 });
 
-test("page refresh is aligned to ten-minute boundaries while hourly content stays stable", () => {
+test("page refresh is aligned to minute boundaries while weather caching stays at ten minutes", () => {
   const now = Date.parse("2026-09-15T21:23:00Z");
   assert.equal(REFRESH_INTERVAL, 10 * 60 * 1000);
   assert.equal(nextRefresh(now), Date.parse("2026-09-15T21:30:00Z"));
-  assert.equal(refreshSeconds(now, true), 7 * 60);
-  assert.equal(refreshSeconds(Date.parse("2026-09-15T21:30:00Z"), true), 10 * 60);
+  assert.equal(refreshSeconds(now, true), 60);
+  assert.equal(refreshSeconds(Date.parse("2026-09-15T21:30:00Z"), true), 60);
   assert.equal(hourSlot(now), hourSlot(nextRefresh(now)));
 });
 

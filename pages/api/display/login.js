@@ -6,7 +6,8 @@ export default function handler(req, res) {
   const origin = req.headers.origin;
   if ((origin && origin !== `https://${req.headers.host}` && !(process.env.NODE_ENV === 'development' && origin === `http://${req.headers.host}`)) || req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).end();
   if (!configured()) return res.status(503).send('Display login has not been configured.');
-  if (!verifyPassword(req.body?.password)) return res.redirect(303, '/display?error=1');
+  const destination = req.body?.returnTo === '/todos' ? '/todos' : '/display';
+  if (!verifyPassword(req.body?.password)) return void res.redirect(303, `${destination}?error=1`);
   res.setHeader('Set-Cookie', cookie(createSession(), process.env.NODE_ENV !== 'development'));
-  return res.redirect(303, '/display');
+  res.redirect(303, destination);
 }

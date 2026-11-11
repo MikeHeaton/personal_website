@@ -2,6 +2,8 @@
 
 Next.js website with a private Electric Objects dashboard at `/display`.
 
+The shared family to-do app is `/todos`, with an authenticated OpenClaw API at `/api/todos`. See [to-do setup, API and iPhone instructions](docs/todos.md). Data lives in its own durable Redis key; automatic backups are deferred.
+
 ## Display drawing framework
 
 The display is a server-rendered SVG 1.1 scene on a **1080 × 1920 design surface**. It scales uniformly to the browser viewport and requires no client JavaScript, external fonts, or canvas runtime. Only the server contacts Google Calendar, Open-Meteo, and durable habit storage.
@@ -32,8 +34,8 @@ Set `GOOGLE_CALENDAR_ICAL_URL` only in local/deployment server environment confi
 - Today and tomorrow use `America/Los_Angeles`, including recurring, all-day, overnight, and multiday events.
 - San Francisco current conditions and five-day forecast come from Open-Meteo in Fahrenheit and inches. Validated hourly data supplies exactly 48 local hourly points for today and tomorrow. The chart uses six-hour ticks, dated midnight labels, a thick black +24-hour divider, and a neutral elapsed-time mask; a dry window retains an explicit blue zero-inches line.
 - A four-row habit grid shows the last seven `America/Los_Angeles` dates, with green checks for recorded true values and black Xs for false or missing values.
-- The page refreshes every ten minutes on ten-minute boundaries. Weather and calendar successes are cached independently in ten-minute slots.
-- A weather failure retries once per minute; calendar and weather failures degrade independently.
+- The page refreshes on one-minute boundaries, alternating the five-day forecast and a two-column to-do list. Weather and calendar successes are cached independently in ten-minute slots.
+- Weather, calendar and to-do failures degrade independently. Missing to-do storage is shown as unavailable and is never reset to an empty list.
 
 ## Development and tests
 

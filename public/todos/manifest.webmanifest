@@ -1,0 +1,15 @@
+{
+  "id": "/todos",
+  "name": "Our to-do list",
+  "short_name": "To do",
+  "description": "One shared list for home.",
+  "start_url": "/todos",
+  "scope": "/todos",
+  "display": "standalone",
+  "background_color": "#f5f1e7",
+  "theme_color": "#f5f1e7",
+  "icons": [
+    { "src": "/todos/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/todos/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
